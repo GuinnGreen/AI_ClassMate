@@ -1,0 +1,7 @@
+{
+  "name": "ClassMate AI - 智慧班級經營系統",
+  "description": "A comprehensive classroom management tool featuring digital whiteboard, daily student tracking, and RAG-based AI report generation using Google Gemini.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
