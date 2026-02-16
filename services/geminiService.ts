@@ -1,13 +1,78 @@
 import { GoogleGenAI } from "@google/genai";
 import { Student, DaySchedule } from "../types";
 
-// 嚴格遵循 Google GenAI SDK 規範，使用 process.env.API_KEY
-// 注意：在 Vite 環境中，你需要確保 process.env.API_KEY 已透過 define 或其他方式注入
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// --- Multi-Key Rotation Logic ---
+
+// 1. Get keys from environment (comma separated)
+const API_KEYS = (process.env.API_KEY || "")
+  .split(",")
+  .map((k) => k.trim())
+  .filter((k) => k.length > 0);
+
+if (API_KEYS.length === 0) {
+  console.warn("Project Warning: No API_KEY found in process.env");
+}
+
+// 2. Initialize a pool of clients
+const clientPool = API_KEYS.map((key) => new GoogleGenAI({ apiKey: key }));
+let currentKeyIndex = 0;
 
 /**
- * RAG 邏輯：聚合學生歷史紀錄與標籤，生成評語
+ * Helper: Run an AI operation with automatic key rotation and retry logic.
  */
+async function callWithRetry<T>(
+  operationName: string,
+  operation: (client: GoogleGenAI) => Promise<T>
+): Promise<T> {
+  if (clientPool.length === 0) {
+    throw new Error("系統錯誤：未設定 API Key");
+  }
+
+  // Max attempts: Try every key at least once, plus some extra retries with backoff.
+  // Example: If 3 keys, try 3 times immediately (rotating). If all fail, wait and try 3 more times.
+  const maxAttempts = Math.max(clientPool.length * 3, 5);
+  let attempt = 0;
+  let delayMs = 2000; // Start with 2s delay if all keys are busy
+
+  while (attempt < maxAttempts) {
+    try {
+      const client = clientPool[currentKeyIndex];
+      return await operation(client);
+    } catch (error: any) {
+      const isRateLimit =
+        error.message?.includes("429") ||
+        error.status === 429 ||
+        error.message?.includes("RESOURCE_EXHAUSTED");
+
+      if (isRateLimit) {
+        console.warn(
+          `[Gemini] Key #${currentKeyIndex} hit rate limit (${operationName}). Rotating...`
+        );
+
+        // Rotate to next key
+        currentKeyIndex = (currentKeyIndex + 1) % clientPool.length;
+        attempt++;
+
+        // If we have cycled through all keys (approximately), it means ALL keys are busy.
+        // We should wait before the next cycle.
+        if (attempt % clientPool.length === 0) {
+          console.warn(`[Gemini] All keys exhausted. Waiting ${delayMs}ms before retry...`);
+          await new Promise(res => setTimeout(res, delayMs));
+          delayMs *= 2; // Exponential backoff: 2s -> 4s -> 8s...
+        }
+
+        // Continue loop to try new key
+        continue;
+      }
+
+      // If other error, throw immediately
+      throw error;
+    }
+  }
+
+  throw new Error("系統忙碌中 (所有 API Key 皆達上限)，請稍後再試。");
+}
+
 
 export const DEFAULT_SYSTEM_INSTRUCTION = `
 你是一位專業、溫暖且客觀的國小班級導師。請根據以下提供的學生整學期行為紀錄 (Evidence) 與教師勾選的特質標籤，撰寫一份期末評語。
@@ -20,7 +85,7 @@ export const DEFAULT_SYSTEM_INSTRUCTION = `
 `;
 
 /**
- * RAG 邏輯：聚合學生歷史紀錄與標籤，生成評語
+ * RAG 邏輯：聚合學生歷史紀錄與標籤，生成評語 (Use Multi-Key)
  */
 export const generateStudentComment = async (
   student: Student,
@@ -81,23 +146,30 @@ export const generateStudentComment = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-      config: {
-        temperature: 0.7,
-      }
+    // 3. Call with Retry Logic
+    const responseText = await callWithRetry("generateStudentComment", async (client) => {
+      const response = await client.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: prompt,
+        config: {
+          temperature: 0.7,
+        }
+      });
+      return response.text;
     });
 
-    return response.text || "無法生成評語，請稍後再試。";
-  } catch (error) {
+    return responseText || "無法生成評語，請稍後再試。";
+  } catch (error: any) {
     console.error("Gemini AI Error:", error);
-    throw new Error("AI 服務暫時無法使用");
+    if (error.message?.includes("系統忙碌中")) {
+      return error.message;
+    }
+    return "AI 服務暫時無法使用 (請檢查網路或 API Key)";
   }
 };
 
 /**
- * 辨識課表圖片/PDF
+ * 辨識課表圖片/PDF (Use Multi-Key)
  * @param base64Data - 圖片的 Base64 字串
  * @param mimeType - 檔案類型 (image/png, image/jpeg)
  */
@@ -120,20 +192,24 @@ export const parseScheduleFromImage = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', // 使用 Vision 能力強的模型
-      contents: {
-        parts: [
-          { inlineData: { mimeType, data: base64Data } },
-          { text: prompt }
-        ]
-      }
+    const daySchedules = await callWithRetry("parseScheduleFromImage", async (client) => {
+      const response = await client.models.generateContent({
+        model: 'gemini-2.5-flash-image', // 使用 Vision 能力強的模型
+        contents: {
+          parts: [
+            { inlineData: { mimeType, data: base64Data } },
+            { text: prompt }
+          ]
+        }
+      });
+      const text = response.text || "[]";
+      // 清理可能的 markdown
+      const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(jsonStr) as DaySchedule[];
     });
 
-    const text = response.text || "[]";
-    // 清理可能的 markdown
-    const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(jsonStr) as DaySchedule[];
+    return daySchedules;
+
   } catch (error) {
     console.error("Schedule Parse Error:", error);
     throw new Error("無法辨識課表，請確認圖片清晰度或手動輸入。");
