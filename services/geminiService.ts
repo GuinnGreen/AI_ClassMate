@@ -8,15 +8,30 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 /**
  * RAG 邏輯：聚合學生歷史紀錄與標籤，生成評語
  */
+
+export const DEFAULT_SYSTEM_INSTRUCTION = `
+你是一位專業、溫暖且客觀的國小班級導師。請根據以下提供的學生整學期行為紀錄 (Evidence) 與教師勾選的特質標籤，撰寫一份期末評語。
+
+【撰寫要求】
+1. 語氣溫和、鼓勵性質為主，但也需委婉指出需要改進的地方 (若有負面紀錄)。
+2. 必須具體引用上述的行為紀錄作為證據，不要憑空捏造。
+3. 針對家長閱讀，格式為一段完整的文章，不需要列點。
+4. 用台灣繁體中文撰寫。
+`;
+
+/**
+ * RAG 邏輯：聚合學生歷史紀錄與標籤，生成評語
+ */
 export const generateStudentComment = async (
-  student: Student, 
+  student: Student,
   teacherNote: string = "",
-  lengthSetting: 'short' | 'medium' | 'long' = 'medium'
+  wordCount: number = 150,
+  customInstruction: string = ""
 ): Promise<string> => {
   // 1. 資料清理與聚合 (RAG Context Building)
   let historyText = "";
   const sortedDates = Object.keys(student.dailyRecords).sort();
-  
+
   if (sortedDates.length === 0) {
     historyText = "該生本學期尚無具體加減分紀錄。";
   } else {
@@ -39,17 +54,14 @@ export const generateStudentComment = async (
 
   const tagsText = student.tags.length > 0 ? student.tags.join(", ") : "無特定標籤";
 
-  // 字數設定轉換
-  let lengthDesc = "";
-  switch (lengthSetting) {
-    case 'short': lengthDesc = "約 50 字左右的精簡短評"; break;
-    case 'medium': lengthDesc = "約 100~150 字的完整段落"; break;
-    case 'long': lengthDesc = "約 250~300 字的詳盡敘述"; break;
-  }
+  // 字數設定
+  const lengthDesc = `約 ${wordCount} 字左右`;
 
   // 2. 建構 Prompt
+  const baseInstruction = customInstruction.trim() || DEFAULT_SYSTEM_INSTRUCTION;
+
   const prompt = `
-    你是一位專業、溫暖且客觀的國小班級導師。請根據以下提供的學生整學期行為紀錄 (Evidence) 與教師勾選的特質標籤，撰寫一份期末評語。
+    ${baseInstruction}
     
     【學生資訊】
     姓名: ${student.name}
@@ -64,17 +76,13 @@ export const generateStudentComment = async (
     【額外教師備註】
     ${teacherNote}
 
-    【撰寫要求】
-    1. 字數控制：請撰寫${lengthDesc}。
-    2. 語氣溫和、鼓勵性質為主，但也需委婉指出需要改進的地方 (若有負面紀錄)。
-    3. 必須具體引用上述的行為紀錄作為證據，不要憑空捏造。
-    4. 針對家長閱讀，格式為一段完整的文章，不需要列點。
-    5. 用台灣繁體中文撰寫。
+    【補充要求】
+    請將字數控制在${lengthDesc}。
   `;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', 
+      model: 'gemini-2.0-flash',
       contents: prompt,
       config: {
         temperature: 0.7,

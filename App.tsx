@@ -62,7 +62,7 @@ import {
   DaySchedule,
   Period
 } from './types';
-import { generateStudentComment, parseScheduleFromImage } from './services/geminiService';
+import { generateStudentComment, parseScheduleFromImage, DEFAULT_SYSTEM_INSTRUCTION } from './services/geminiService';
 import { LiveSession } from './services/liveService';
 import {
   Users,
@@ -275,6 +275,7 @@ const Modal = ({ isOpen, onClose, title, children, theme, maxWidth = "max-w-md" 
 };
 
 // --- Component: Manual Schedule Editor ---
+// --- Component: Manual Schedule Editor ---
 const ManualScheduleEditor = ({
   initialSchedule,
   onSave,
@@ -286,76 +287,66 @@ const ManualScheduleEditor = ({
 }) => {
   interface EditorRow {
     id: string;
-    periodName: string;
-    label: string;
-    subjects: string[];
+    periodName: string; // "08:40-09:20"
+    label: string;      // "第一節"
+    subjects: string[]; // ["SubjectMon", ..., "SubjectFri"]
+    isLunch: boolean;
   }
 
   const [rows, setRows] = useState<EditorRow[]>([]);
 
+  // Fixed configuration: 4 Morning + 1 Lunch + 3 Afternoon = 8 rows
+  const ROW_CONFIG = [
+    { label: '第一節', defaultTime: '08:40-09:20', isLunch: false },
+    { label: '第二節', defaultTime: '09:30-10:10', isLunch: false },
+    { label: '第三節', defaultTime: '10:30-11:10', isLunch: false },
+    { label: '第四節', defaultTime: '11:20-12:00', isLunch: false },
+    { label: '午休', defaultTime: '12:00-13:20', isLunch: true },
+    { label: '第五節', defaultTime: '13:30-14:10', isLunch: false },
+    { label: '第六節', defaultTime: '14:20-15:00', isLunch: false },
+    { label: '第七節', defaultTime: '15:20-16:00', isLunch: false },
+  ];
+
   useEffect(() => {
+    // Initialize Rows
+    const newRows: EditorRow[] = ROW_CONFIG.map((cfg, idx) => ({
+      id: `row-${idx}`,
+      label: cfg.label,
+      periodName: cfg.defaultTime,
+      subjects: ['', '', '', '', ''],
+      isLunch: cfg.isLunch
+    }));
+
+    // If existing schedule, try to fill data
     if (initialSchedule && initialSchedule.length > 0) {
-      const periodsMap = new Map<string, EditorRow>();
-      const defaultOrder = ['第一節', '第二節', '第三節', '第四節', '午休', '第五節', '第六節', '第七節'];
+      newRows.forEach((row, rowIdx) => {
+        let foundTime = "";
 
-      defaultOrder.forEach((pName, idx) => {
-        periodsMap.set(pName, {
-          id: idx.toString(),
-          periodName: "00:00-00:00",
-          label: pName,
-          subjects: ['', '', '', '', '']
-        });
-      });
+        for (let day = 1; day <= 5; day++) {
+          const dayData = initialSchedule.find(d => d.dayOfWeek === day);
+          if (dayData) {
+            const period = dayData.periods.find(p => p.periodName.includes(row.label));
+            if (period) {
+              row.subjects[day - 1] = period.subject;
 
-      initialSchedule.forEach((dayData) => {
-        const dayIdx = dayData.dayOfWeek - 1;
-        if (dayIdx >= 0 && dayIdx < 5) {
-          dayData.periods.forEach(p => {
-            let label = p.periodName;
-            let existing = periodsMap.get(label);
-
-            if (!existing) {
-              const foundKey = Array.from(periodsMap.keys()).find(k => label.includes(k));
-              if (foundKey) existing = periodsMap.get(foundKey);
-            }
-
-            if (existing) {
-              existing.subjects[dayIdx] = p.subject;
-              if (/\d/.test(label) && existing.periodName === "00:00-00:00") {
-                existing.periodName = label;
+              // Robust Time Extraction
+              // Remove the label from the string to get just the time
+              // e.g. "第一節 08:40-09:20" -> "08:40-09:20"
+              const cleanPeriodName = period.periodName.replace(row.label, '').trim();
+              if (cleanPeriodName) {
+                foundTime = cleanPeriodName;
               }
-            } else {
-              const newRow: EditorRow = {
-                id: crypto.randomUUID(),
-                periodName: "",
-                label: label,
-                subjects: ['', '', '', '', '']
-              };
-              newRow.subjects[dayIdx] = p.subject;
-              periodsMap.set(label, newRow);
             }
-          });
+          }
+        }
+
+        if (foundTime) {
+          row.periodName = foundTime;
         }
       });
-      setRows(Array.from(periodsMap.values()));
-    } else {
-      const defaultRows = [
-        { label: '第一節', time: '08:40-09:20' },
-        { label: '第二節', time: '09:30-10:10' },
-        { label: '第三節', time: '10:30-11:10' },
-        { label: '第四節', time: '11:20-12:00' },
-        { label: '午休', time: '12:00-13:20' },
-        { label: '第五節', time: '13:30-14:10' },
-        { label: '第六節', time: '14:20-15:00' },
-        { label: '第七節', time: '15:20-16:00' },
-      ];
-      setRows(defaultRows.map((r, i) => ({
-        id: i.toString(),
-        periodName: r.time,
-        label: r.label,
-        subjects: ['', '', '', '', '']
-      })));
     }
+
+    setRows(newRows);
   }, [initialSchedule]);
 
   const handleSubjectChange = (rowIdx: number, dayIdx: number, val: string) => {
@@ -364,23 +355,10 @@ const ManualScheduleEditor = ({
     setRows(newRows);
   };
 
-  const handleRowChange = (rowIdx: number, field: 'periodName' | 'label', val: string) => {
+  const handleTimeChange = (rowIdx: number, val: string) => {
     const newRows = [...rows];
-    newRows[rowIdx][field] = val;
+    newRows[rowIdx].periodName = val;
     setRows(newRows);
-  };
-
-  const addRow = () => {
-    setRows([...rows, {
-      id: crypto.randomUUID(),
-      periodName: "00:00-00:00",
-      label: "新節次",
-      subjects: ['', '', '', '', '']
-    }]);
-  };
-
-  const deleteRow = (idx: number) => {
-    setRows(rows.filter((_, i) => i !== idx));
   };
 
   const handleSave = () => {
@@ -388,17 +366,20 @@ const ManualScheduleEditor = ({
     for (let day = 1; day <= 5; day++) {
       const periods: Period[] = [];
       rows.forEach(row => {
-        const subject = row.subjects[day - 1];
-        if (subject || row.label) {
-          const finalName = row.periodName && row.periodName !== "00:00-00:00"
-            ? `${row.label} ${row.periodName}`
-            : row.label;
+        const subject = row.isLunch ? "午休" : row.subjects[day - 1];
 
-          periods.push({
-            periodName: finalName,
-            subject: subject || ""
-          });
-        }
+        // Final Period Name Construction
+        // Ensure we don't duplicate the label if user typed it in time field
+        const userTime = row.periodName.replace(row.label, '').trim();
+
+        const finalName = userTime
+          ? `${row.label} ${userTime}`
+          : row.label;
+
+        periods.push({
+          periodName: finalName,
+          subject: subject || ""
+        });
       });
       schedule.push({ dayOfWeek: day, periods });
     }
@@ -406,63 +387,73 @@ const ManualScheduleEditor = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className={`overflow-x-auto border ${theme.border} rounded-xl`}>
         <table className="w-full text-sm min-w-[600px]">
           <thead className={`${theme.surfaceAccent} font-bold ${theme.text}`}>
             <tr>
-              <th className="p-3 text-left w-32">節次名稱</th>
-              <th className="p-3 text-left w-24">時間</th>
+              <th className="p-3 text-left w-24">節次</th>
+              <th className="p-3 text-left w-32">時間</th>
               <th className="p-3 w-20">週一</th>
               <th className="p-3 w-20">週二</th>
               <th className="p-3 w-20">週三</th>
               <th className="p-3 w-20">週四</th>
               <th className="p-3 w-20">週五</th>
-              <th className="p-3 w-10"></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, idx) => (
-              <tr key={row.id} className={`border-t ${theme.border} hover:${theme.surfaceAlt} group`}>
+              <tr
+                key={row.id}
+                className={`
+                  ${row.isLunch ? `bg-amber-50 dark:bg-amber-900/20 border-y-2 border-amber-200 dark:border-amber-800` : `border-t ${theme.border} hover:${theme.surfaceAlt}`}
+                `}
+              >
+                {/* Label Column */}
                 <td className="p-2">
-                  <input
-                    value={row.label}
-                    onChange={(e) => handleRowChange(idx, 'label', e.target.value)}
-                    className={`w-full bg-transparent outline-none font-bold ${theme.text}`}
-                  />
+                  <span className={`font-bold ${row.isLunch ? 'text-amber-700 dark:text-amber-400' : theme.text} block pl-2`}>
+                    {row.label}
+                  </span>
                 </td>
+
+                {/* Time Column */}
                 <td className="p-2">
                   <input
                     value={row.periodName}
-                    onChange={(e) => handleRowChange(idx, 'periodName', e.target.value)}
-                    className={`w-full bg-transparent outline-none text-xs ${theme.textLight}`}
+                    onChange={(e) => handleTimeChange(idx, e.target.value)}
+                    className={`w-full bg-transparent outline-none text-xs font-mono 
+                        ${row.isLunch ? 'text-amber-700 dark:text-amber-400 font-bold' : theme.textLight}
+                    `}
                     placeholder="00:00"
                   />
                 </td>
-                {[0, 1, 2, 3, 4].map(day => (
-                  <td key={day} className={`p-2 border-l ${theme.border}`}>
-                    <input
-                      value={row.subjects[day]}
-                      onChange={(e) => handleSubjectChange(idx, day, e.target.value)}
-                      className={`w-full text-center bg-transparent outline-none focus:font-bold ${theme.text}`}
-                    />
+
+                {/* Subjects */}
+                {row.isLunch ? (
+                  <td colSpan={5} className="p-2 text-center font-bold text-amber-600 dark:text-amber-500 tracking-widest opacity-80">
+                    — 午 休 時 間 —
                   </td>
-                ))}
-                <td className="p-2 text-center">
-                  <button onClick={() => deleteRow(idx)} className="text-[#c48a8a] opacity-0 group-hover:opacity-100 transition"><Trash2 className="w-4 h-4" /></button>
-                </td>
+                ) : (
+                  [0, 1, 2, 3, 4].map(day => (
+                    <td key={day} className={`p-2 border-l ${theme.border}`}>
+                      <input
+                        value={row.subjects[day]}
+                        onChange={(e) => handleSubjectChange(idx, day, e.target.value)}
+                        className={`w-full text-center bg-transparent outline-none focus:font-bold ${theme.text}`}
+                      />
+                    </td>
+                  ))
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <div className="flex justify-between items-center pt-2">
-        <button onClick={addRow} className={`text-xs font-bold ${theme.primary} flex items-center gap-1 hover:opacity-80`}>
-          <Plus className="w-4 h-4" /> 新增節次
-        </button>
-        <button onClick={handleSave} className={`px-6 py-2 ${theme.primary} text-white rounded-lg font-bold shadow-md hover:opacity-90`}>
-          儲存課表
+      <div className="flex justify-end pt-2">
+        <button onClick={handleSave} className={`px-6 py-3 ${theme.primary} text-white rounded-xl font-bold shadow-lg hover:opacity-90 hover:shadow-xl transition transform active:scale-95`}>
+          <Save className="w-5 h-5 inline-block mr-2" />
+          儲存並更新課表
         </button>
       </div>
     </div>
@@ -651,23 +642,25 @@ const WeeklyCalendar = ({
 };
 
 // --- Component: Behavior Editor ---
+// --- Component: Behavior Editor ---
 const BehaviorEditor = ({
   buttons,
   onUpdate,
   title,
-  theme
+  theme,
+  fixedValue
 }: {
   buttons: BehaviorButton[],
   onUpdate: (btns: BehaviorButton[]) => void,
   title: string,
-  theme: ThemePalette
+  theme: ThemePalette,
+  fixedValue: number
 }) => {
   const [newLabel, setNewLabel] = useState('');
-  const [newValue, setNewValue] = useState(1);
 
   const handleAdd = () => {
     if (!newLabel.trim()) return;
-    onUpdate([...buttons, { id: crypto.randomUUID(), label: newLabel, value: Math.abs(newValue) * (newValue < 0 ? 1 : 1) }]);
+    onUpdate([...buttons, { id: crypto.randomUUID(), label: newLabel, value: fixedValue }]);
     setNewLabel('');
   };
 
@@ -681,19 +674,30 @@ const BehaviorEditor = ({
       <div className="space-y-2 mb-3">
         {buttons.map(btn => (
           <div key={btn.id} className={`flex items-center justify-between p-2 rounded-lg border ${theme.border} ${theme.bg}`}>
-            <span className={theme.text}>{btn.label} ({btn.value})</span>
+            <span className={theme.text}>{btn.label} ({btn.value > 0 ? `+${btn.value}` : btn.value})</span>
             <button onClick={() => handleRemove(btn.id)} className="text-[#c48a8a] hover:bg-white rounded p-1"><X className="w-4 h-4" /></button>
           </div>
         ))}
       </div>
       <div className="flex gap-2">
-        <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="名稱" className={`flex-1 p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text}`} />
-        <input type="number" value={newValue} onChange={e => setNewValue(parseInt(e.target.value))} className={`w-16 p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text}`} />
-        <button onClick={handleAdd} className={`${theme.primary} text-white p-2 rounded-lg`}><Plus className="w-5 h-5" /></button>
+        <input
+          value={newLabel}
+          onChange={e => setNewLabel(e.target.value)}
+          placeholder="輸入行為名稱..."
+          className={`flex-1 p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text}`}
+          onKeyDown={e => e.key === 'Enter' && handleAdd()}
+        />
+        <button onClick={handleAdd} className={`${theme.primary} text-white p-2 px-4 rounded-lg font-bold flex items-center shadow-md hover:opacity-90 active:scale-95 transition`}>
+          新增
+        </button>
       </div>
     </div>
   );
 };
+
+// ... (StudentImporter, StudentManager omitted for brevity, assuming they are unchanged in this block or handled separately if needed. 
+// Actually I need to be careful not to delete them if they are in the range. 
+// The range is large. Let's do multiple localized edits instead to be safe.)
 
 // --- Component: Student Importer (Excel Copy-Paste Support) ---
 const StudentImporter = ({
@@ -904,13 +908,15 @@ const StudentDetailWorkspace = ({
   student,
   onBack,
   theme,
-  classConfig
+  classConfig,
+  onConfigUpdate
 }: {
   userUid: string,
   student: Student,
   onBack: () => void,
   theme: ThemePalette,
-  classConfig: ClassConfig
+  classConfig: ClassConfig,
+  onConfigUpdate?: (config: ClassConfig) => void
 }) => {
   const [mode, setMode] = useState<'daily' | 'ai'>('daily');
   const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
@@ -936,7 +942,12 @@ const StudentDetailWorkspace = ({
       positive: type === 'positive' ? newBtns : positiveBehaviors,
       negative: type === 'negative' ? newBtns : negativeBehaviors
     };
-    await setDoc(ref, { ...currentConfig, customBehaviors: updatedBehaviors }, { merge: true });
+
+    // Optimistic Update
+    const newConfig = { ...currentConfig, customBehaviors: updatedBehaviors };
+    if (onConfigUpdate) onConfigUpdate(newConfig);
+
+    await setDoc(ref, newConfig, { merge: true });
   };
 
   const handleAddPoint = async (behavior: BehaviorButton) => {
@@ -998,7 +1009,9 @@ const StudentDetailWorkspace = ({
   // --- AI Logic ---
   const [isGenerating, setIsGenerating] = useState(false);
   const [tempComment, setTempComment] = useState(student.comment);
-  const [commentLength, setCommentLength] = useState<'short' | 'medium' | 'long'>('medium');
+  const [commentLength, setCommentLength] = useState<number>(150);
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
   const [originalAiText, setOriginalAiText] = useState(student.originalAiComment || "");
   const [isCopied, setIsCopied] = useState(false);
   const [activeEvaluationTab, setActiveEvaluationTab] = useState(0); // 0: Personality, 1: Learning, 2: Life
@@ -1021,12 +1034,22 @@ const StudentDetailWorkspace = ({
 
   const handleGenerateAI = async () => {
     setIsGenerating(true);
+    const logRef = collection(db, `users/${userUid}/logs`);
     try {
-      const generatedText = await generateStudentComment(student, "", commentLength);
+      const generatedText = await generateStudentComment(student, "", commentLength, customPrompt);
       setTempComment(generatedText);
       setOriginalAiText(generatedText);
       const studentRef = doc(db, `users/${userUid}/students/${student.id}`);
       await updateDoc(studentRef, { comment: generatedText, originalAiComment: generatedText });
+
+      // Log generation event
+      await addDoc(logRef, {
+        studentId: student.id,
+        type: 'ai_generate',
+        timestamp: Date.now(),
+        lengthSetting: commentLength,
+        hasCustomPrompt: !!customPrompt
+      });
     } catch (err: any) {
       alert("生成失敗: " + err.message);
     } finally {
@@ -1187,7 +1210,7 @@ const StudentDetailWorkspace = ({
                 </div>
 
                 <div className={`${theme.surface} p-5 rounded-2xl border ${theme.border} shadow-sm`}>
-                  <label className={`text-sm font-bold ${theme.primaryText} mb-4 flex items-center gap-2`}><Smile className="w-4 h-4" /> 正面行為</label>
+                  <label className={`text-sm font-bold ${theme.primaryText} mb-4 flex items-center gap-2`}><Smile className="w-4 h-4" /> 正面表現</label>
                   <div className="grid grid-cols-2 gap-3">
                     {positiveBehaviors.map((btn) => (
                       <button key={btn.id} onClick={() => handleAddPoint(btn)}
@@ -1253,19 +1276,19 @@ const StudentDetailWorkspace = ({
                     </div>
 
                     {/* Content Area for Active Tab */}
-                    <div className={`p-5 rounded-2xl border ${theme.border} ${theme.surfaceAlt} mb-6 min-h-[300px]`}>
+                    <div className={`p-5 rounded-2xl border ${theme.border} ${theme.surfaceAlt} mb-6`}>
                       <div className="grid md:grid-cols-2 gap-6">
                         {/* Positive Column */}
                         <div>
                           <h4 className={`text-sm font-bold ${theme.text} mb-3 flex items-center gap-2`}>
                             <div className={`w-2 h-2 rounded-full ${theme.accentPositive}`}></div> 正向特質
                           </h4>
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-1.5">
                             {EVALUATION_CATEGORIES[activeEvaluationTab]?.positive.map(tag => (
                               <button
                                 key={tag}
                                 onClick={() => handleToggleTag(tag)}
-                                className={`px-3 py-2 rounded-lg text-sm font-bold transition-all border-2 w-full md:w-auto text-left md:text-center
+                                className={`px-2.5 py-1.5 rounded-lg text-sm font-bold transition-all border-2 w-full md:w-auto text-left md:text-center
                                     ${student.tags.includes(tag)
                                     ? `${theme.primary} border-${theme.primary} text-white shadow-md transform scale-105`
                                     : `border-transparent bg-white dark:bg-black/10 ${theme.text} hover:border-${theme.primary}`
@@ -1283,12 +1306,12 @@ const StudentDetailWorkspace = ({
                           <h4 className={`text-sm font-bold ${theme.text} mb-3 flex items-center gap-2`}>
                             <div className={`w-2 h-2 rounded-full ${theme.accentNegative}`}></div> 待改進
                           </h4>
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-1.5">
                             {EVALUATION_CATEGORIES[activeEvaluationTab]?.negative.map(tag => (
                               <button
                                 key={tag}
                                 onClick={() => handleToggleTag(tag)}
-                                className={`px-3 py-2 rounded-lg text-sm font-bold transition-all border-2 w-full md:w-auto text-left md:text-center
+                                className={`px-2.5 py-1.5 rounded-lg text-sm font-bold transition-all border-2 w-full md:w-auto text-left md:text-center
                                     ${student.tags.includes(tag)
                                     ? `${theme.accentNegative} border-${theme.accentNegative} text-white shadow-md transform scale-105`
                                     : `border-transparent bg-white dark:bg-black/10 ${theme.text} hover:border-${theme.accentNegative}`
@@ -1303,17 +1326,24 @@ const StudentDetailWorkspace = ({
                       </div>
                     </div>
                     <h3 className={`text-sm font-bold ${theme.text} mb-3 flex items-center gap-2`}><AlignLeft className="w-4 h-4" /> 生成字數設定</h3>
-                    <div className={`grid grid-cols-3 gap-2 p-1 ${theme.surfaceAlt} rounded-xl`}>
-                      {(['short', 'medium', 'long'] as const).map((len) => (
-                        <button key={len} onClick={() => setCommentLength(len)} className={`py-2 text-sm font-bold rounded-lg transition ${commentLength === len ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}>
-                          {len === 'short' && '短 (50字)'}{len === 'medium' && '標準 (150字)'}{len === 'long' && '詳細 (300字)'}
+                    <div className={`grid grid-cols-4 gap-2 p-1 ${theme.surfaceAlt} rounded-xl mb-6`}>
+                      {([50, 100, 150, 200] as const).map((len) => (
+                        <button key={len} onClick={() => setCommentLength(len)} className={`py-2 text-sm font-bold rounded-lg transition ${commentLength === len ? `${theme.surface} ${theme.text} shadow-sm border ${theme.border}` : `${theme.textLight} hover:${theme.text}`}`}>
+                          {len}字
                         </button>
                       ))}
                     </div>
+
                   </div>
-                  <div className={`${theme.inputBg} p-8 rounded-3xl border ${theme.border} relative overflow-hidden`}>
+
+                  <div className={`${theme.inputBg} p-6 rounded-3xl border ${theme.border} relative overflow-hidden`}>
                     <div className="relative z-10">
-                      <h3 className={`text-xl font-bold ${theme.text} mb-2`}>準備生成</h3>
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className={`text-xl font-bold ${theme.text}`}>準備生成</h3>
+                        <button onClick={() => setIsPromptModalOpen(true)} className={`p-2 rounded-lg ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} hover:bg-[rgba(0,0,0,0.05)] transition flex items-center gap-2 text-xs font-bold`}>
+                          <Settings className="w-4 h-4" /> 自訂提示詞 Prompt
+                        </button>
+                      </div>
                       <p className={`text-base ${theme.textLight} mb-6`}>系統將讀取該生所有資料作為 AI 上下文。</p>
                       <button onClick={handleGenerateAI} disabled={isGenerating} className={`w-full py-4 ${theme.primary} text-white rounded-2xl font-bold shadow-lg hover:opacity-90 hover:shadow-xl transition disabled:opacity-50 flex items-center justify-center gap-2 transform hover:-translate-y-0.5`}>
                         {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> 生成評語中...</> : <><Sparkles className="w-5 h-5" /> 立即生成期末評語</>}
@@ -1381,11 +1411,48 @@ const StudentDetailWorkspace = ({
 
       <Modal isOpen={isBehaviorSettingsOpen} onClose={() => setIsBehaviorSettingsOpen(false)} title="⚙️ 自訂快速記分按鈕" theme={theme}>
         <div className="space-y-6">
-          <BehaviorEditor buttons={positiveBehaviors} onUpdate={(btns) => handleUpdateBehaviors('positive', btns)} title="正面行為 (Positive)" theme={theme} />
+          <BehaviorEditor buttons={positiveBehaviors} onUpdate={(btns) => handleUpdateBehaviors('positive', btns)} title="正面表現 (Positive)" theme={theme} fixedValue={1} />
           <div className={`border-t ${theme.border}`}></div>
-          <BehaviorEditor buttons={negativeBehaviors} onUpdate={(btns) => handleUpdateBehaviors('negative', btns)} title="待改進 (Improvement)" theme={theme} />
+          <BehaviorEditor buttons={negativeBehaviors} onUpdate={(btns) => handleUpdateBehaviors('negative', btns)} title="待改進 (Improvement)" theme={theme} fixedValue={-1} />
           <div className="pt-2">
             <button onClick={() => setIsBehaviorSettingsOpen(false)} className={`w-full py-3 ${theme.primary} text-white rounded-xl font-bold`}>完成設定</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Prompt Editor Modal */}
+      <Modal
+        isOpen={isPromptModalOpen}
+        onClose={() => setIsPromptModalOpen(false)}
+        title="🤖 自訂 AI 提示詞 (System Prompt)"
+        theme={theme}
+        maxWidth="max-w-2xl"
+      >
+        <div className="space-y-4">
+          <div className={`p-4 rounded-xl ${theme.surfaceAlt} border ${theme.border} text-sm ${theme.textLight}`}>
+            系統預設提示詞已經包含了角色設定、學生資料與行為紀錄的引用要求。您可以在此基礎上增加或修改指令。
+            <br />
+            <span className="font-bold text-red-400">注意：若清空則會使用系統預設提示詞。</span>
+          </div>
+          <textarea
+            value={customPrompt || DEFAULT_SYSTEM_INSTRUCTION}
+            onChange={(e) => setCustomPrompt(e.target.value)}
+            className={`w-full h-64 p-4 rounded-xl border ${theme.border} ${theme.inputBg} ${theme.text} font-mono text-sm leading-relaxed outline-none focus:ring-2 ${theme.focusRing}`}
+            placeholder={DEFAULT_SYSTEM_INSTRUCTION}
+          />
+          <div className="flex gap-2 justify-end pt-2">
+            <button
+              onClick={() => setCustomPrompt('')}
+              className={`px-4 py-2 ${theme.surfaceAlt} ${theme.text} rounded-xl font-bold hover:bg-red-50 hover:text-red-500 transition`}
+            >
+              回復預設值
+            </button>
+            <button
+              onClick={() => setIsPromptModalOpen(false)}
+              className={`px-6 py-2 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90 transition`}
+            >
+              完成設定
+            </button>
           </div>
         </div>
       </Modal>
@@ -1616,13 +1683,48 @@ const Sidebar = ({
   );
 };
 
+// --- Helper: Schedule Logic ---
+const isCurrentPeriod = (periodName: string): boolean => {
+  // Regex to extract time range "HH:MM-HH:MM"
+  const match = periodName.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+  if (!match) return false;
+
+  const [_, startStr, endStr] = match;
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const parseTime = (str: string) => {
+    const [h, m] = str.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const startMinutes = parseTime(startStr);
+  const endMinutes = parseTime(endStr);
+
+  return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+};
+
+const getPeriodParts = (fullString: string) => {
+  // Expected format: "Name Time" (space separated)
+  // e.g. "第一節 08:40-09:20"
+  const parts = fullString.trim().split(' ');
+  if (parts.length >= 2) {
+    const name = parts[0];
+    const time = parts.slice(1).join(' ');
+    return { name, time };
+  }
+  return { name: fullString, time: '' };
+};
+
 const WhiteboardWorkspace = ({
   userUid,
   config,
+  onConfigUpdate,
   theme
 }: {
   userUid: string,
   config: ClassConfig,
+  onConfigUpdate?: (newConfig: ClassConfig) => void,
   theme: ThemePalette
 }) => {
   const [boardContent, setBoardContent] = useState(config.class_board || '');
@@ -1640,8 +1742,11 @@ const WhiteboardWorkspace = ({
   }, []);
 
   const saveBoard = async () => {
+    const newConfig = { ...config, class_board: boardContent };
+    if (onConfigUpdate) onConfigUpdate(newConfig); // Optimistic Update
+
     const ref = doc(db, `users/${userUid}/settings/config`);
-    await setDoc(ref, { ...config, class_board: boardContent }, { merge: true });
+    await setDoc(ref, newConfig, { merge: true });
     setIsEditing(false);
   };
 
@@ -1709,12 +1814,29 @@ const WhiteboardWorkspace = ({
           <div className="flex-1 p-6 overflow-y-auto">
             {displaySchedule && displaySchedule.periods.length > 0 ? (
               <div className="space-y-3">
-                {displaySchedule.periods.map((p, idx) => (
-                  <div key={idx} className={`flex items-center justify-between p-3 rounded-xl border ${theme.border} ${theme.bg}`}>
-                    <span className={`text-sm ${theme.textLight}`}>{p.periodName}</span>
-                    <span className={`font-bold ${theme.text}`}>{p.subject || "---"}</span>
-                  </div>
-                ))}
+                {/* Header Row for 3-Column Layout */}
+
+                {displaySchedule.periods.map((p, idx) => {
+                  const { name, time } = getPeriodParts(p.periodName);
+                  const isActive = isCurrentPeriod(p.periodName);
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`
+                        grid grid-cols-[auto_1fr_1fr] gap-4 items-center p-3 rounded-xl border transition-all duration-300
+                        ${isActive
+                          ? `${theme.primary} border-transparent shadow-lg scale-105 z-10`
+                          : `${theme.bg} border ${theme.border}`
+                        }
+                      `}
+                    >
+                      <span className={`w-12 text-center text-sm font-bold ${isActive ? 'text-white' : theme.text}`}>{name}</span>
+                      <span className={`text-center text-xs font-mono whitespace-nowrap ${isActive ? 'text-white/80' : theme.textLight} bg-black/5 dark:bg-white/10 py-1 px-2 rounded-lg`}>{time}</span>
+                      <span className={`text-center font-bold text-lg ${isActive ? 'text-white' : theme.text}`}>{p.subject || "---"}</span>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
@@ -1739,8 +1861,11 @@ const WhiteboardWorkspace = ({
         <ManualScheduleEditor
           initialSchedule={config.weeklySchedule}
           onSave={async (newSchedule) => {
+            const newConfig = { ...config, weeklySchedule: newSchedule };
+            if (onConfigUpdate) onConfigUpdate(newConfig); // Optimistic Update
+
             const ref = doc(db, `users/${userUid}/settings/config`);
-            await setDoc(ref, { ...config, weeklySchedule: newSchedule }, { merge: true });
+            await setDoc(ref, newConfig, { merge: true });
             setShowScheduleEditor(false);
           }}
           theme={theme}
@@ -1928,11 +2053,13 @@ export default function App() {
               onBack={() => setSelectedStudentId(null)}
               theme={theme}
               classConfig={classConfig}
+              onConfigUpdate={setClassConfig}
             />
           ) : (
             <WhiteboardWorkspace
               userUid={user!.uid}
               config={classConfig}
+              onConfigUpdate={setClassConfig}
               theme={theme}
             />
           )}
@@ -1983,6 +2110,8 @@ export default function App() {
           />
         )}
       </Modal>
+
+
 
       <Modal
         isOpen={showDeleteAuth}
