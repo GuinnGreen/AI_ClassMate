@@ -38,7 +38,8 @@ cp .env.example .env.local
 打開 `.env.local` 填寫：
 ```ini
 # Google Gemini API
-GEMINI_API_KEY=your_key_here
+# 支援多組 API Key 輪值 (用逗號隔開) 以避免 Rate Limit
+GEMINI_API_KEY=key1,key2,key3
 
 # Firebase Configuration
 VITE_FIREBASE_API_KEY=your_key_here
