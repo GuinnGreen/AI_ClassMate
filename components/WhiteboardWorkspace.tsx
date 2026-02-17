@@ -47,10 +47,14 @@ export const WhiteboardWorkspace = ({
   return (
     <div className="flex flex-col h-full p-6 lg:p-8 overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 shrink-0">
-        <div className="flex items-end gap-4">
-          <h1 className={`${theme.text} text-5xl font-bold tracking-tight leading-none`}>{currentTime.time}</h1>
-          <p className={`${theme.textLight} text-xl font-medium pb-1`}>{currentTime.date}</p>
+      <div className="flex justify-between items-center mb-6 shrink-0">
+        <div className="flex items-baseline gap-2">
+          <Clock className={`w-6 h-6 ${theme.textLight} self-center`} />
+          <h1 className={`${theme.text} text-5xl font-extrabold tracking-tight tabular-nums`}>{currentTime.time}</h1>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <CalendarIcon className={`w-5 h-5 ${theme.textLight} self-center`} />
+          <p className={`${theme.text} text-2xl font-semibold tracking-wide`}>{currentTime.date}</p>
         </div>
       </div>
 
