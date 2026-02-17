@@ -152,6 +152,7 @@ export default function App() {
                 <StudentDetailWorkspace
                   userUid={user!.uid}
                   student={students.find(s => s.id === selectedStudentId)!}
+                  students={students}
                   onBack={() => setSelectedStudentId(null)}
                   classConfig={classConfig}
                   onConfigUpdate={setClassConfig}

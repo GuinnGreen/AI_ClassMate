@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ChevronLeft, Sparkles, Save, Trash2, ClipboardList,
   Smile, Frown, School, Clock, Settings, Copy, AlignLeft,
-  Check, Lock
+  Check, Lock, Download
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatDate } from '../utils/date';
@@ -36,12 +36,14 @@ import { auth } from '../firebase';
 export const StudentDetailWorkspace = ({
   userUid,
   student,
+  students,
   onBack,
   classConfig,
   onConfigUpdate,
 }: {
   userUid: string;
   student: Student;
+  students: Student[];
   onBack: () => void;
   classConfig: ClassConfig;
   onConfigUpdate?: (config: ClassConfig) => void;
@@ -60,6 +62,105 @@ export const StudentDetailWorkspace = ({
 
   // Behavior Settings Modal
   const [isBehaviorSettingsOpen, setIsBehaviorSettingsOpen] = useState(false);
+
+  // Export CSV State
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportFields, setExportFields] = useState({
+    behaviorDetail: true,
+    dailyScore: true,
+    note: false,
+    aiComment: true,
+    tags: true,
+    totalScore: true,
+  });
+
+  const escapeCsvValue = (val: string): string => {
+    if (val.includes(',') || val.includes('\n') || val.includes('"')) {
+      return '"' + val.replace(/"/g, '""') + '"';
+    }
+    return val;
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['座號', '姓名', '日期'];
+    if (exportFields.behaviorDetail) headers.push('行為紀錄明細');
+    if (exportFields.dailyScore) headers.push('當日得分');
+    if (exportFields.note) headers.push('輔導備註');
+    if (exportFields.aiComment) headers.push('AI 評語');
+    if (exportFields.tags) headers.push('特質標籤');
+    if (exportFields.totalScore) headers.push('累計總分');
+
+    const rows: string[][] = [];
+
+    const sortedStudents = [...students].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    for (const s of sortedStudents) {
+      const dates = Object.keys(s.dailyRecords).sort();
+      for (const date of dates) {
+        const record = s.dailyRecords[date];
+        const hasPoints = record.points.length > 0;
+        const hasNote = record.note && record.note.trim().length > 0;
+        if (!hasPoints && !hasNote) continue;
+
+        const row: string[] = [
+          String((s.order ?? 0) + 1),
+          s.name,
+          date,
+        ];
+
+        if (exportFields.behaviorDetail) {
+          const groups: Record<string, { label: string; value: number; count: number }> = {};
+          record.points.forEach(p => {
+            if (!groups[p.label]) groups[p.label] = { label: p.label, value: p.value, count: 0 };
+            groups[p.label].count += 1;
+          });
+          const detail = Object.values(groups)
+            .map(g => `${g.label}(${g.value > 0 ? '+' : ''}${g.value})×${g.count}`)
+            .join(', ');
+          row.push(detail);
+        }
+
+        if (exportFields.dailyScore) {
+          const score = record.points.reduce((sum, p) => sum + p.value, 0);
+          row.push(String(score));
+        }
+
+        if (exportFields.note) {
+          row.push(record.note || '');
+        }
+
+        if (exportFields.aiComment) {
+          row.push(s.comment || '');
+        }
+
+        if (exportFields.tags) {
+          row.push(s.tags.join(', '));
+        }
+
+        if (exportFields.totalScore) {
+          row.push(String(s.totalScore));
+        }
+
+        rows.push(row);
+      }
+    }
+
+    const csvContent = '\uFEFF' +
+      headers.map(escapeCsvValue).join(',') + '\n' +
+      rows.map(row => row.map(escapeCsvValue).join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = formatDate(new Date());
+    a.href = url;
+    a.download = `班級紀錄_${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setIsExportModalOpen(false);
+  };
 
   const positiveBehaviors = classConfig.customBehaviors?.positive || DEFAULT_POSITIVE_BEHAVIORS;
   const negativeBehaviors = classConfig.customBehaviors?.negative || DEFAULT_NEGATIVE_BEHAVIORS;
@@ -270,9 +371,18 @@ export const StudentDetailWorkspace = ({
               </div>
             </div>
           </div>
-          <div className={`flex ${theme.surfaceAlt} p-1.5 rounded-xl`}>
-            <button onClick={() => setMode('daily')} className={`px-5 py-2 text-sm font-bold rounded-lg transition ${mode === 'daily' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}>日常紀錄</button>
-            <button onClick={() => setMode('ai')} className={`px-5 py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><Sparkles className="w-4 h-4" /> AI 評語</button>
+          <div className="flex items-center gap-2">
+            <div className={`flex ${theme.surfaceAlt} p-1.5 rounded-xl`}>
+              <button onClick={() => setMode('daily')} className={`px-5 py-2 text-sm font-bold rounded-lg transition ${mode === 'daily' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}>日常紀錄</button>
+              <button onClick={() => setMode('ai')} className={`px-5 py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><Sparkles className="w-4 h-4" /> AI 評語</button>
+            </div>
+            <button
+              onClick={() => setIsExportModalOpen(true)}
+              className={`p-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} transition`}
+              title="匯出整班紀錄"
+            >
+              <Download className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
@@ -572,6 +682,48 @@ export const StudentDetailWorkspace = ({
           <BehaviorEditor buttons={negativeBehaviors} onUpdate={(btns) => handleUpdateBehaviors('negative', btns)} title="待改進 (Improvement)" fixedValue={-1} />
           <div className="pt-2">
             <button onClick={() => setIsBehaviorSettingsOpen(false)} className={`w-full py-3 ${theme.primary} text-white rounded-xl font-bold`}>完成設定</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Export CSV Modal */}
+      <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title="匯出整班紀錄">
+        <div className="space-y-4">
+          <p className={`text-sm ${theme.textLight}`}>請勾選要匯出的欄位，固定欄位（座號、姓名、日期）會自動包含。</p>
+          <div className="space-y-3">
+            {([
+              { key: 'behaviorDetail' as const, label: '行為紀錄明細' },
+              { key: 'dailyScore' as const, label: '當日得分' },
+              { key: 'note' as const, label: '輔導備註', warning: '含隱私資料' },
+              { key: 'aiComment' as const, label: 'AI 評語' },
+              { key: 'tags' as const, label: '特質標籤' },
+              { key: 'totalScore' as const, label: '累計總分' },
+            ]).map(({ key, label, warning }) => (
+              <label key={key} className={`flex items-center gap-3 p-3 rounded-xl border ${theme.border} ${theme.surface} cursor-pointer hover:${theme.surfaceAlt} transition`}>
+                <input
+                  type="checkbox"
+                  checked={exportFields[key]}
+                  onChange={() => setExportFields(prev => ({ ...prev, [key]: !prev[key] }))}
+                  className="w-4 h-4 rounded accent-current"
+                />
+                <span className={`font-bold text-sm ${theme.text}`}>{label}</span>
+                {warning && <span className="text-xs text-red-400 font-bold">{warning}</span>}
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={handleExportCsv}
+              className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2`}
+            >
+              <Download className="w-4 h-4" /> 匯出 CSV
+            </button>
+            <button
+              onClick={() => setIsExportModalOpen(false)}
+              className={`flex-1 py-3 ${theme.surfaceAlt} ${theme.text} rounded-xl font-bold hover:opacity-80 transition`}
+            >
+              取消
+            </button>
           </div>
         </div>
       </Modal>
