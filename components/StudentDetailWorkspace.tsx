@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ChevronLeft, Sparkles, Save, Trash2, ClipboardList,
   Smile, Frown, School, Clock, Settings, Copy, AlignLeft,
@@ -125,6 +125,17 @@ export const StudentDetailWorkspace = ({
   const [originalAiText, setOriginalAiText] = useState(student.originalAiComment || "");
   const [isCopied, setIsCopied] = useState(false);
   const [activeEvaluationTab, setActiveEvaluationTab] = useState(0);
+  const [generationStage, setGenerationStage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const typingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearTimers = useCallback(() => {
+    if (typingRef.current) { clearInterval(typingRef.current); typingRef.current = null; }
+    if (progressRef.current) { clearInterval(progressRef.current); progressRef.current = null; }
+  }, []);
+
+  useEffect(() => clearTimers, [clearTimers]);
 
   useEffect(() => {
     setTempComment(student.comment);
@@ -137,19 +148,59 @@ export const StudentDetailWorkspace = ({
     await toggleStudentTag(userUid, student.id, tag, student.tags);
   };
 
+  const PROGRESS_MESSAGES = [
+    '收集學生資料中...',
+    'AI 正在分析行為紀錄...',
+    '撰寫評語中，請稍候...',
+    '仍在努力生成中...',
+  ];
+
   const handleGenerateAI = async () => {
+    clearTimers();
     setIsGenerating(true);
+    setTempComment('');
+    setGenerationStage(PROGRESS_MESSAGES[0]);
+
+    // Rotate progress messages every 3 seconds
+    let stageIndex = 0;
+    progressRef.current = setInterval(() => {
+      stageIndex = Math.min(stageIndex + 1, PROGRESS_MESSAGES.length - 1);
+      setGenerationStage(PROGRESS_MESSAGES[stageIndex]);
+    }, 3000);
+
     try {
       const generatedText = await generateStudentComment(student, "", commentLength, customPrompt);
-      setTempComment(generatedText);
+
+      // Stop progress, start typewriter
+      clearTimers();
+      setGenerationStage('');
+      setIsGenerating(false);
+      setIsTyping(true);
+
+      let charIndex = 0;
+      await new Promise<void>((resolve) => {
+        typingRef.current = setInterval(() => {
+          charIndex++;
+          setTempComment(generatedText.slice(0, charIndex));
+          if (charIndex >= generatedText.length) {
+            if (typingRef.current) clearInterval(typingRef.current);
+            typingRef.current = null;
+            resolve();
+          }
+        }, 30);
+      });
+
+      setIsTyping(false);
       setOriginalAiText(generatedText);
       await updateStudentComment(userUid, student.id, generatedText, generatedText);
       await logAiGeneration(userUid, student.id, commentLength, !!customPrompt);
     } catch (err: unknown) {
+      clearTimers();
+      setGenerationStage('');
+      setIsTyping(false);
+      setIsGenerating(false);
       const msg = err instanceof Error ? err.message : '未知錯誤';
       alert("生成失敗: " + msg);
-    } finally {
-      setIsGenerating(false);
     }
   };
 
@@ -447,16 +498,19 @@ export const StudentDetailWorkspace = ({
                         </button>
                       </div>
                       <p className={`text-base ${theme.textLight} mb-6`}>系統將讀取該生所有資料作為 AI 上下文。</p>
-                      <button onClick={handleGenerateAI} disabled={isGenerating} className={`w-full py-4 ${theme.primary} text-white rounded-2xl font-bold shadow-lg hover:opacity-90 hover:shadow-xl transition disabled:opacity-50 flex items-center justify-center gap-2 transform hover:-translate-y-0.5`}>
-                        {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> 生成評語中...</> : <><Sparkles className="w-5 h-5" /> 立即生成期末評語</>}
+                      <button onClick={handleGenerateAI} disabled={isGenerating || isTyping} className={`w-full py-4 ${theme.primary} text-white rounded-2xl font-bold shadow-lg hover:opacity-90 hover:shadow-xl transition disabled:opacity-50 flex items-center justify-center gap-2 transform hover:-translate-y-0.5`}>
+                        {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> 生成評語中...</> : isTyping ? <><Sparkles className="w-5 h-5 animate-spin" /> 輸出中...</> : <><Sparkles className="w-5 h-5" /> 立即生成期末評語</>}
                       </button>
+                      {generationStage && (
+                        <p className={`text-sm ${theme.textLight} text-center mt-3 animate-pulse`}>{generationStage}</p>
+                      )}
                     </div>
                   </div>
                 </div>
                 <div className="flex flex-col h-full min-h-[500px]">
                   <div className={`flex-1 ${theme.surface} p-8 rounded-3xl shadow-sm border ${theme.border} flex flex-col relative`}>
                     <label className={`text-sm font-bold ${theme.textLight} mb-4 block flex items-center gap-2`}><School className="w-4 h-4" /> AI 生成結果</label>
-                    <textarea value={tempComment} onChange={(e) => setTempComment(e.target.value)} placeholder="評語將顯示於此..." className={`flex-1 w-full p-6 ${theme.inputBg} rounded-2xl border ${theme.border} outline-none focus:ring-2 ${theme.focusRing} transition leading-8 ${theme.text} resize-none text-lg`} />
+                    <textarea value={tempComment} onChange={(e) => setTempComment(e.target.value)} readOnly={isTyping} placeholder={isGenerating ? '等待 AI 回應中...' : '評語將顯示於此...'} className={`flex-1 w-full p-6 ${theme.inputBg} rounded-2xl border ${theme.border} outline-none focus:ring-2 ${theme.focusRing} transition leading-8 ${theme.text} resize-none text-lg ${isTyping ? 'cursor-default' : ''}`} />
                     <div className="absolute bottom-6 right-6 flex items-center gap-3 animate-pop-in">
                       {tempComment && (
                         <button
