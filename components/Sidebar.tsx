@@ -17,6 +17,9 @@ export const Sidebar = ({
   setFontSizeLevel,
   isDarkMode,
   setIsDarkMode,
+  napTimeStart,
+  napTimeEnd,
+  onNapTimeChange,
 }: {
   students: Student[];
   selectedStudentId: string | null;
