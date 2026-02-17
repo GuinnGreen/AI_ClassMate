@@ -1,11 +1,6 @@
 # ClassMate AI - 智慧班級經營系統
 
 碩士論文專案，結合 **Google Gemini AI** 與 **Firebase** 的智慧班級經營系統，協助老師進行學生管理、行為紀錄、AI 評語生成及電子白板功能。
-
-<div align="center">
-<img width="800" alt="Dashboard Preview" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
 ---
 
 ## 技術棧
