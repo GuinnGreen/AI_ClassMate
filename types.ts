@@ -55,6 +55,8 @@ export interface ClassConfig {
   };
   weeklySchedule?: DaySchedule[]; // 儲存週一到週五的課表
   boardWritingMode?: BoardWritingMode; // 公告欄書寫方向
+  napTimeStart?: string; // 午休開始時間 (HH:MM)
+  napTimeEnd?: string;   // 午休結束時間 (HH:MM)
 }
 
 export const DEFAULT_POSITIVE_BEHAVIORS: BehaviorButton[] = [

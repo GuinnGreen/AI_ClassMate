@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { Users, Upload } from 'lucide-react';
 import { auth } from './firebase';
@@ -11,6 +11,7 @@ import {
   updateStudentName,
   importStudents,
   deleteStudents,
+  updateClassConfig,
 } from './services/firebaseService';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -31,6 +32,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [fontSizeLevel, setFontSizeLevel] = useState(1);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const napAutoActiveRef = useRef(false);
+  const preNapDarkRef = useRef(false);
+  const isDarkModeRef = useRef(false);
+  const wasInNapRef = useRef(false);
   const theme = isDarkMode ? DARK_THEME : LIGHT_THEME;
 
   // Student Manager State
@@ -58,6 +63,64 @@ export default function App() {
     const unsubConfig = subscribeToConfig(user.uid, setClassConfig);
     return () => { unsubStudents(); unsubConfig(); };
   }, [user?.uid]);
+
+  // Nap time auto-dark: keep ref in sync
+  useEffect(() => { isDarkModeRef.current = isDarkMode; }, [isDarkMode]);
+
+  const handleToggleDarkMode = (newValue: boolean) => {
+    if (napAutoActiveRef.current) napAutoActiveRef.current = false;
+    setIsDarkMode(newValue);
+  };
+
+  useEffect(() => {
+    const { napTimeStart, napTimeEnd } = classConfig;
+    if (!napTimeStart || !napTimeEnd) {
+      if (napAutoActiveRef.current) {
+        napAutoActiveRef.current = false;
+        setIsDarkMode(preNapDarkRef.current);
+      }
+      wasInNapRef.current = false;
+      return;
+    }
+
+    const parseTime = (str: string) => {
+      const [h, m] = str.split(':').map(Number);
+      return h * 60 + m;
+    };
+    const startMin = parseTime(napTimeStart);
+    const endMin = parseTime(napTimeEnd);
+
+    const checkNapTime = () => {
+      const currentMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+      const inNap = currentMinutes >= startMin && currentMinutes < endMin;
+
+      if (inNap && !wasInNapRef.current) {
+        wasInNapRef.current = true;
+        if (!isDarkModeRef.current) {
+          preNapDarkRef.current = false;
+          napAutoActiveRef.current = true;
+          setIsDarkMode(true);
+        }
+      } else if (!inNap && wasInNapRef.current) {
+        wasInNapRef.current = false;
+        if (napAutoActiveRef.current) {
+          napAutoActiveRef.current = false;
+          setIsDarkMode(preNapDarkRef.current);
+        }
+      }
+    };
+
+    checkNapTime();
+    const interval = setInterval(checkNapTime, 30_000);
+    return () => clearInterval(interval);
+  }, [classConfig.napTimeStart, classConfig.napTimeEnd]);
+
+  const handleNapTimeChange = async (start: string, end: string) => {
+    if (!user) return;
+    const newConfig = { ...classConfig, napTimeStart: start || '', napTimeEnd: end || '' };
+    setClassConfig(newConfig);
+    await updateClassConfig(user.uid, newConfig);
+  };
 
   const handleLogout = () => signOut(auth);
 
@@ -124,7 +187,10 @@ export default function App() {
             fontSizeLevel={fontSizeLevel}
             setFontSizeLevel={setFontSizeLevel}
             isDarkMode={isDarkMode}
-            setIsDarkMode={setIsDarkMode}
+            setIsDarkMode={handleToggleDarkMode}
+            napTimeStart={classConfig.napTimeStart}
+            napTimeEnd={classConfig.napTimeEnd}
+            onNapTimeChange={handleNapTimeChange}
           />
           <div className="flex-1 flex flex-col h-full overflow-hidden p-3 lg:p-4 relative">
             <div className={`flex-1 overflow-hidden rounded-3xl shadow-sm border ${theme.border} ${theme.surface} relative`}>

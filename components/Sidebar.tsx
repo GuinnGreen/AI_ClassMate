@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Users, LogOut, School, Edit3, Moon, Sun,
-  Plus, Minus, Type
+  Plus, Minus, Type, Sunset
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { Modal } from './ui/Modal';
 import { Student } from '../types';
 
 export const Sidebar = ({
@@ -26,9 +27,20 @@ export const Sidebar = ({
   setFontSizeLevel: (level: number) => void;
   isDarkMode: boolean;
   setIsDarkMode: (v: boolean) => void;
+  napTimeStart?: string;
+  napTimeEnd?: string;
+  onNapTimeChange: (start: string, end: string) => void;
 }) => {
   const theme = useTheme();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [showNapSettings, setShowNapSettings] = useState(false);
+  const [napStart, setNapStart] = useState(napTimeStart || '');
+  const [napEnd, setNapEnd] = useState(napTimeEnd || '');
+
+  useEffect(() => {
+    setNapStart(napTimeStart || '');
+    setNapEnd(napTimeEnd || '');
+  }, [napTimeStart, napTimeEnd]);
 
   return (
     <>
@@ -111,13 +123,22 @@ export const Sidebar = ({
         {/* Footer Section */}
         <div className={`p-4 border-t ${theme.border} space-y-3 shrink-0`}>
           <div className="flex items-center justify-between px-2">
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`p-2 rounded-lg hover:${theme.surface} ${theme.textLight} hover:${theme.text} transition`}
-              title="切換深色模式"
-            >
-              {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className={`p-2 rounded-lg hover:${theme.surface} ${theme.textLight} hover:${theme.text} transition`}
+                title="切換深色模式"
+              >
+                {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+              <button
+                onClick={() => setShowNapSettings(true)}
+                className={`p-2 rounded-lg hover:${theme.surface} transition ${napTimeStart && napTimeEnd ? theme.text : theme.textLight} hover:${theme.text}`}
+                title="午休自動深色設定"
+              >
+                <Sunset className="w-5 h-5" />
+              </button>
+            </div>
             <div className={`flex items-center gap-1 ${theme.surface} rounded-lg border ${theme.border} p-1`}>
               <button
                 onClick={() => setFontSizeLevel(Math.max(0, fontSizeLevel - 1))}
@@ -151,6 +172,58 @@ export const Sidebar = ({
       {isMobileOpen && (
         <div className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm" onClick={() => setIsMobileOpen(false)} />
       )}
+
+      <Modal
+        isOpen={showNapSettings}
+        onClose={() => setShowNapSettings(false)}
+        title="午休自動深色模式"
+        maxWidth="max-w-sm"
+      >
+        <div className="space-y-4">
+          <p className={`text-sm ${theme.textLight}`}>設定午休時段，系統將自動切換為深色模式，結束後恢復原本主題。</p>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className={`block text-sm font-bold mb-1 ${theme.text}`}>開始時間</label>
+              <input
+                type="time"
+                value={napStart}
+                onChange={(e) => setNapStart(e.target.value)}
+                className={`w-full p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} outline-none focus:ring-2 ${theme.focusRing}`}
+              />
+            </div>
+            <div className="flex-1">
+              <label className={`block text-sm font-bold mb-1 ${theme.text}`}>結束時間</label>
+              <input
+                type="time"
+                value={napEnd}
+                onChange={(e) => setNapEnd(e.target.value)}
+                className={`w-full p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} outline-none focus:ring-2 ${theme.focusRing}`}
+              />
+            </div>
+          </div>
+          <div className="flex justify-between pt-2">
+            <button
+              onClick={() => {
+                onNapTimeChange('', '');
+                setShowNapSettings(false);
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-bold ${theme.textLight} hover:opacity-80 transition`}
+            >
+              清除
+            </button>
+            <button
+              onClick={() => {
+                onNapTimeChange(napStart, napEnd);
+                setShowNapSettings(false);
+              }}
+              disabled={!napStart || !napEnd}
+              className={`px-4 py-2 rounded-lg text-sm font-bold ${theme.primary} text-white transition disabled:opacity-40`}
+            >
+              儲存
+            </button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 };
