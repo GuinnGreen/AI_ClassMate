@@ -25,6 +25,18 @@
   animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
+/* Animation for weekly calendar slide */
+@keyframes slide-in-left {
+  from { transform: translateX(-30%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(30%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+.animate-slide-in-left  { animation: slide-in-left  250ms ease-out; }
+.animate-slide-in-right { animation: slide-in-right 250ms ease-out; }
+
 /* Animation for click feedback (Deletion) */
 .active-shrink:active {
   transform: scale(0.92);
