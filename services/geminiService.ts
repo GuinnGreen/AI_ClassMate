@@ -3,23 +3,23 @@ import { Student, DaySchedule } from "../types";
 
 // --- Multi-Key Rotation Logic ---
 
-// 1. Get keys from environment (comma separated)
-const API_KEYS = (process.env.API_KEY || "")
-  .split(",")
+const rawKeys = process.env.API_KEY || "";
+const API_KEYS = rawKeys
+  .split(/[,;\s]+/)
   .map((k) => k.trim())
   .filter((k) => k.length > 0);
+
+console.log(`[Gemini Service] Initialized with ${API_KEYS.length} keys.`);
 
 if (API_KEYS.length === 0) {
   console.warn("Project Warning: No API_KEY found in process.env");
 }
 
-// 2. Initialize a pool of clients
 const clientPool = API_KEYS.map((key) => new GoogleGenAI({ apiKey: key }));
 let currentKeyIndex = 0;
 
-/**
- * Helper: Run an AI operation with automatic key rotation and retry logic.
- */
+const MAX_BACKOFF_MS = 30000;
+
 async function callWithRetry<T>(
   operationName: string,
   operation: (client: GoogleGenAI) => Promise<T>
@@ -28,44 +28,39 @@ async function callWithRetry<T>(
     throw new Error("系統錯誤：未設定 API Key");
   }
 
-  // Max attempts: Try every key at least once, plus some extra retries with backoff.
-  // Example: If 3 keys, try 3 times immediately (rotating). If all fail, wait and try 3 more times.
   const maxAttempts = Math.max(clientPool.length * 3, 5);
   let attempt = 0;
-  let delayMs = 2000; // Start with 2s delay if all keys are busy
+  let delayMs = 2000;
 
   while (attempt < maxAttempts) {
     try {
       const client = clientPool[currentKeyIndex];
       return await operation(client);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const errStatus = (error as { status?: number }).status;
       const isRateLimit =
-        error.message?.includes("429") ||
-        error.status === 429 ||
-        error.message?.includes("RESOURCE_EXHAUSTED");
+        errMsg.includes("429") ||
+        errStatus === 429 ||
+        errMsg.includes("RESOURCE_EXHAUSTED");
 
       if (isRateLimit) {
         console.warn(
           `[Gemini] Key #${currentKeyIndex} hit rate limit (${operationName}). Rotating...`
         );
 
-        // Rotate to next key
         currentKeyIndex = (currentKeyIndex + 1) % clientPool.length;
         attempt++;
 
-        // If we have cycled through all keys (approximately), it means ALL keys are busy.
-        // We should wait before the next cycle.
         if (attempt % clientPool.length === 0) {
           console.warn(`[Gemini] All keys exhausted. Waiting ${delayMs}ms before retry...`);
           await new Promise(res => setTimeout(res, delayMs));
-          delayMs *= 2; // Exponential backoff: 2s -> 4s -> 8s...
+          delayMs = Math.min(delayMs * 2, MAX_BACKOFF_MS);
         }
 
-        // Continue loop to try new key
         continue;
       }
 
-      // If other error, throw immediately
       throw error;
     }
   }
@@ -84,16 +79,12 @@ export const DEFAULT_SYSTEM_INSTRUCTION = `
 4. 用台灣繁體中文撰寫。
 `;
 
-/**
- * RAG 邏輯：聚合學生歷史紀錄與標籤，生成評語 (Use Multi-Key)
- */
 export const generateStudentComment = async (
   student: Student,
   teacherNote: string = "",
   wordCount: number = 150,
   customInstruction: string = ""
 ): Promise<string> => {
-  // 1. 資料清理與聚合 (RAG Context Building)
   let historyText = "";
   const sortedDates = Object.keys(student.dailyRecords).sort();
 
@@ -118,26 +109,22 @@ export const generateStudentComment = async (
   }
 
   const tagsText = student.tags.length > 0 ? student.tags.join(", ") : "無特定標籤";
-
-  // 字數設定
   const lengthDesc = `約 ${wordCount} 字左右`;
-
-  // 2. 建構 Prompt
   const baseInstruction = customInstruction.trim() || DEFAULT_SYSTEM_INSTRUCTION;
 
   const prompt = `
     ${baseInstruction}
-    
+
     【學生資訊】
     姓名: ${student.name}
     總積分: ${student.totalScore}
-    
+
     【特質標籤】
     ${tagsText}
-    
+
     【整學期行為紀錄 (RAG Context)】
     ${historyText}
-    
+
     【額外教師備註】
     ${teacherNote}
 
@@ -146,7 +133,6 @@ export const generateStudentComment = async (
   `;
 
   try {
-    // 3. Call with Retry Logic
     const responseText = await callWithRetry("generateStudentComment", async (client) => {
       const response = await client.models.generateContent({
         model: 'gemini-2.0-flash',
@@ -159,20 +145,16 @@ export const generateStudentComment = async (
     });
 
     return responseText || "無法生成評語，請稍後再試。";
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Gemini AI Error:", error);
-    if (error.message?.includes("系統忙碌中")) {
-      return error.message;
+    const errMsg = error instanceof Error ? error.message : String(error);
+    if (errMsg.includes("系統忙碌中")) {
+      return errMsg;
     }
     return "AI 服務暫時無法使用 (請檢查網路或 API Key)";
   }
 };
 
-/**
- * 辨識課表圖片/PDF (Use Multi-Key)
- * @param base64Data - 圖片的 Base64 字串
- * @param mimeType - 檔案類型 (image/png, image/jpeg)
- */
 export const parseScheduleFromImage = async (
   base64Data: string,
   mimeType: string
@@ -194,7 +176,7 @@ export const parseScheduleFromImage = async (
   try {
     const daySchedules = await callWithRetry("parseScheduleFromImage", async (client) => {
       const response = await client.models.generateContent({
-        model: 'gemini-2.5-flash-image', // 使用 Vision 能力強的模型
+        model: 'gemini-2.5-flash-image',
         contents: {
           parts: [
             { inlineData: { mimeType, data: base64Data } },
@@ -203,14 +185,18 @@ export const parseScheduleFromImage = async (
         }
       });
       const text = response.text || "[]";
-      // 清理可能的 markdown
       const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(jsonStr) as DaySchedule[];
+      try {
+        return JSON.parse(jsonStr) as DaySchedule[];
+      } catch {
+        console.error("Failed to parse JSON from AI response:", jsonStr);
+        throw new Error("AI 回傳的格式無法解析，請重試或手動輸入。");
+      }
     });
 
     return daySchedules;
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Schedule Parse Error:", error);
     throw new Error("無法辨識課表，請確認圖片清晰度或手動輸入。");
   }
