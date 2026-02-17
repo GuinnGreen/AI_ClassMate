@@ -59,6 +59,7 @@ export const StudentDetailWorkspace = ({
   const [verifyPasswordVal, setVerifyPasswordVal] = useState('');
   const [verifyError, setVerifyError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'notes' | 'export'>('notes');
 
   // Behavior Settings Modal
   const [isBehaviorSettingsOpen, setIsBehaviorSettingsOpen] = useState(false);
@@ -192,8 +193,8 @@ export const StudentDetailWorkspace = ({
     }
   };
 
-  // --- Secure Note Logic ---
-  const handleVerifyAndOpenNotes = async () => {
+  // --- Secure Verification Logic ---
+  const handleVerifyPassword = async () => {
     if (!auth.currentUser) return;
     setIsVerifying(true);
     setVerifyError('');
@@ -201,9 +202,13 @@ export const StudentDetailWorkspace = ({
       await verifyPassword(auth.currentUser, verifyPasswordVal);
       setShowPasswordModal(false);
       setVerifyPasswordVal('');
-      const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '' };
-      setTempNote(currentDayRecord.note || '');
-      setIsNoteModalOpen(true);
+      if (pendingAction === 'export') {
+        setIsExportModalOpen(true);
+      } else {
+        const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '' };
+        setTempNote(currentDayRecord.note || '');
+        setIsNoteModalOpen(true);
+      }
     } catch {
       setVerifyError('密碼錯誤');
     } finally {
@@ -377,7 +382,7 @@ export const StudentDetailWorkspace = ({
               <button onClick={() => setMode('ai')} className={`px-5 py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><Sparkles className="w-4 h-4" /> AI 評語</button>
             </div>
             <button
-              onClick={() => setIsExportModalOpen(true)}
+              onClick={() => { setPendingAction('export'); setShowPasswordModal(true); }}
               className={`p-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} transition`}
               title="匯出整班紀錄"
             >
@@ -461,7 +466,7 @@ export const StudentDetailWorkspace = ({
 
                 <div className={`${theme.surface} p-2 rounded-2xl border ${theme.border} shadow-sm`}>
                   <button
-                    onClick={() => setShowPasswordModal(true)}
+                    onClick={() => { setPendingAction('notes'); setShowPasswordModal(true); }}
                     className={`w-full p-4 rounded-xl ${theme.surfaceAccent} border-2 ${theme.border} text-center hover:border-[#8da399] transition-all transform active:scale-95 group`}
                   >
                     <div className="flex items-center justify-center gap-2 mb-1">
@@ -662,14 +667,14 @@ export const StudentDetailWorkspace = ({
 
       <Modal isOpen={showPasswordModal} onClose={() => { setShowPasswordModal(false); setVerifyPasswordVal(''); setVerifyError(''); }} title="🔒 安全驗證">
         <div className="space-y-4">
-          <p className="text-sm text-[#c48a8a] bg-[#fcecec] p-3 rounded-xl border border-[#e6bwbw]">為了保護學生隱私，請輸入密碼以解鎖輔導紀錄。</p>
+          <p className="text-sm text-[#c48a8a] bg-[#fcecec] p-3 rounded-xl border border-[#e6bwbw]">{pendingAction === 'export' ? '為了保護學生隱私，請輸入密碼以匯出班級紀錄。' : '為了保護學生隱私，請輸入密碼以解鎖輔導紀錄。'}</p>
           <div>
             <label className={`block text-sm font-bold ${theme.text} mb-2`}>請輸入登入密碼：</label>
             <input type="password" className={`w-full p-3 ${theme.inputBg} border ${theme.border} rounded-xl focus:ring-2 focus:ring-[#c48a8a] outline-none ${theme.text}`} value={verifyPasswordVal} onChange={(e) => setVerifyPasswordVal(e.target.value)} placeholder="Password" />
             {verifyError && <p className="text-xs text-red-500 mt-2 font-bold">{verifyError}</p>}
           </div>
           <div className="flex gap-2 pt-2">
-            <button onClick={handleVerifyAndOpenNotes} disabled={isVerifying || !verifyPasswordVal} className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90 disabled:opacity-50`}>{isVerifying ? '驗證中...' : '解鎖紀錄'}</button>
+            <button onClick={handleVerifyPassword} disabled={isVerifying || !verifyPasswordVal} className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90 disabled:opacity-50`}>{isVerifying ? '驗證中...' : pendingAction === 'export' ? '驗證並匯出' : '解鎖紀錄'}</button>
             <button onClick={() => setShowPasswordModal(false)} className={`flex-1 py-3 ${theme.surfaceAlt} ${theme.text} rounded-xl font-bold hover:opacity-80`}>取消</button>
           </div>
         </div>

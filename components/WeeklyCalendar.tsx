@@ -59,7 +59,7 @@ export const WeeklyCalendar = ({
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
-      <div className="overflow-hidden">
+      <div className="overflow-x-hidden py-1">
         <div
           key={days[0].toISOString()}
           className={`grid grid-cols-7 gap-2 ${slideDirection === 'left' ? 'animate-slide-in-left' : slideDirection === 'right' ? 'animate-slide-in-right' : ''}`}
