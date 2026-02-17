@@ -17,7 +17,7 @@
 | 建置工具 | Vite | 6 |
 | CSS 框架 | Tailwind CSS (`@tailwindcss/vite` plugin) | 4 |
 | 後端服務 | Firebase | 12 |
-| AI 引擎 | Google Gemini SDK (`@google/genai`) | 1.x |
+| AI 引擎 | Google Gemini SDK (`@google/genai`) + Groq 備援 | 1.x |
 | 圖示 | Lucide React | 0.564 |
 
 ---
@@ -26,7 +26,7 @@
 
 - **學生管理** — 批次匯入（支援複製貼上名單）、編輯、刪除學生資料
 - **行為紀錄** — 自訂正向 / 待改進行為按鈕，快速加減分
-- **AI 評語生成** — RAG 架構，根據學期行為紀錄與老師勾選的特質標籤自動產生期末評語；支援多組 API Key 輪值（指數退避，上限 30 秒），可自訂系統 Prompt
+- **AI 評語生成** — RAG 架構，根據學期行為紀錄與老師勾選的特質標籤自動產生期末評語；支援多組 API Key 輪值（指數退避，上限 30 秒），可自訂系統 Prompt；Gemini 額度用盡時自動切換 Groq 備援
 - **電子白板 & 課表** — 班級公告白板、每週課表、今日課表即時顯示
 - **評量標籤系統** — 3 大類 40+ 標籤，供老師快速勾選學生特質
 - **深色模式 & 字體大小** — React Context 驅動的佈景主題切換與字體大小調整
@@ -112,6 +112,10 @@ cp .env.example .env.local
 # Google Gemini API Key（支援多組，以逗號分隔）
 GEMINI_API_KEY=your_key_1,your_key_2,your_key_3
 
+# Groq API Key（備援 AI，Gemini 額度用盡時自動切換）
+# 免費申請：https://console.groq.com/keys
+GROQ_API_KEY=your_groq_api_key
+
 # Firebase Configuration
 VITE_FIREBASE_API_KEY=your_firebase_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
@@ -140,6 +144,7 @@ npm run dev
 | Secret 名稱 | 說明 |
 |-------------|------|
 | `GEMINI_API_KEY` | Gemini API Key（多組以逗號分隔） |
+| `GROQ_API_KEY` | Groq API Key（備援 AI，選填） |
 | `VITE_FIREBASE_API_KEY` | Firebase API Key |
 | `VITE_FIREBASE_AUTH_DOMAIN` | Firebase Auth Domain |
 | `VITE_FIREBASE_PROJECT_ID` | Firebase Project ID |

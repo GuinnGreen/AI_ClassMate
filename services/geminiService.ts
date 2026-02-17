@@ -68,6 +68,36 @@ async function callWithRetry<T>(
   throw new Error("系統忙碌中 (所有 API Key 皆達上限)，請稍後再試。");
 }
 
+// --- Groq Fallback (OpenAI-compatible API) ---
+
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+
+async function callGroqFallback(prompt: string): Promise<string> {
+  if (!GROQ_API_KEY) {
+    throw new Error("未設定 GROQ_API_KEY，無法使用備援 AI");
+  }
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "qwen/qwen3-32b",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Groq API 錯誤 (${response.status}): ${errorBody}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "";
+}
 
 export const DEFAULT_SYSTEM_INSTRUCTION = `
 你是一位專業、溫暖且客觀的國小班級導師。請根據以下提供的學生整學期行為紀錄 (Evidence) 與教師勾選的特質標籤，撰寫一份期末評語。
@@ -148,6 +178,18 @@ export const generateStudentComment = async (
   } catch (error: unknown) {
     console.error("Gemini AI Error:", error);
     const errMsg = error instanceof Error ? error.message : String(error);
+
+    // Gemini 全部失敗時，嘗試 Groq 備援
+    if (GROQ_API_KEY) {
+      try {
+        console.warn("[AI] Gemini 全部失敗，嘗試 Groq fallback...");
+        const fallbackText = await callGroqFallback(prompt);
+        if (fallbackText) return fallbackText;
+      } catch (groqError: unknown) {
+        console.error("[AI] Groq fallback 也失敗:", groqError);
+      }
+    }
+
     if (errMsg.includes("系統忙碌中")) {
       return errMsg;
     }
