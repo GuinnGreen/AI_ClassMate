@@ -32,6 +32,9 @@ export interface BehaviorButton {
   value: number;
 }
 
+// --- 書寫方向 ---
+export type BoardWritingMode = 'horizontal-tb' | 'vertical-lr' | 'vertical-rl';
+
 // --- 課表相關 ---
 export interface Period {
   periodName: string; // e.g. "第一節", "08:00-08:40"
@@ -51,6 +54,7 @@ export interface ClassConfig {
     negative: BehaviorButton[];
   };
   weeklySchedule?: DaySchedule[]; // 儲存週一到週五的課表
+  boardWritingMode?: BoardWritingMode; // 公告欄書寫方向
 }
 
 export const DEFAULT_POSITIVE_BEHAVIORS: BehaviorButton[] = [

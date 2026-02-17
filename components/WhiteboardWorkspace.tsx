@@ -6,7 +6,7 @@ import { isCurrentPeriod, getPeriodParts } from '../utils/schedule';
 import { updateClassConfig } from '../services/firebaseService';
 import { Modal } from './ui/Modal';
 import { ManualScheduleEditor } from './ManualScheduleEditor';
-import { ClassConfig } from '../types';
+import { ClassConfig, BoardWritingMode } from '../types';
 
 export const WhiteboardWorkspace = ({
   userUid,
@@ -22,6 +22,19 @@ export const WhiteboardWorkspace = ({
   const [isEditing, setIsEditing] = useState(false);
   const [currentTime, setCurrentTime] = useState(getCurrentTime());
   const [showScheduleEditor, setShowScheduleEditor] = useState(false);
+  const writingMode: BoardWritingMode = config.boardWritingMode ?? 'horizontal-tb';
+
+  const setWritingMode = async (mode: BoardWritingMode) => {
+    const newConfig = { ...config, boardWritingMode: mode };
+    if (onConfigUpdate) onConfigUpdate(newConfig);
+    await updateClassConfig(userUid, newConfig);
+  };
+
+  const writingModeOptions: { mode: BoardWritingMode; label: string }[] = [
+    { mode: 'horizontal-tb', label: '橫' },
+    { mode: 'vertical-lr', label: '直↓→' },
+    { mode: 'vertical-rl', label: '直↓←' },
+  ];
 
   useEffect(() => {
     setBoardContent(config.class_board || '');
@@ -65,23 +78,40 @@ export const WhiteboardWorkspace = ({
             <h3 className={`text-lg font-bold ${theme.text} flex items-center gap-2`}>
               <ClipboardList className="w-5 h-5" /> 班級公告欄
             </h3>
-            <button
-              onClick={() => isEditing ? saveBoard() : setIsEditing(true)}
-              className={`px-4 py-2 rounded-xl font-bold text-sm transition ${isEditing ? `${theme.primary} text-white` : `${theme.surface} ${theme.text} border ${theme.border}`}`}
-            >
-              {isEditing ? '儲存' : '編輯'}
-            </button>
+            <div className="flex items-center gap-2">
+              <div className={`flex rounded-lg border ${theme.border} overflow-hidden text-xs font-bold`}>
+                {writingModeOptions.map(({ mode, label }) => (
+                  <button
+                    key={mode}
+                    onClick={() => setWritingMode(mode)}
+                    className={`px-2.5 py-1.5 transition ${writingMode === mode ? `${theme.primary} text-white` : `${theme.surface} ${theme.text} hover:opacity-80`}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => isEditing ? saveBoard() : setIsEditing(true)}
+                className={`px-4 py-2 rounded-xl font-bold text-sm transition ${isEditing ? `${theme.primary} text-white` : `${theme.surface} ${theme.text} border ${theme.border}`}`}
+              >
+                {isEditing ? '儲存' : '編輯'}
+              </button>
+            </div>
           </div>
-          <div className="flex-1 p-6 relative overflow-y-auto">
+          <div className={`flex-1 p-6 relative ${writingMode !== 'horizontal-tb' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-y-auto'}`}>
             {isEditing ? (
               <textarea
                 value={boardContent}
                 onChange={(e) => setBoardContent(e.target.value)}
+                style={{ writingMode }}
                 className={`w-full h-full p-4 ${theme.inputBg} rounded-xl border ${theme.border} focus:ring-2 ${theme.focusRing} outline-none resize-none text-2xl leading-relaxed ${theme.text} font-handwritten notebook-paper`}
                 placeholder="請輸入今日事項、聯絡簿內容..."
               />
             ) : (
-              <div className={`w-full h-full whitespace-pre-wrap leading-relaxed text-2xl ${theme.text} font-handwritten notebook-paper ${!boardContent && 'text-opacity-50 italic'}`}>
+              <div
+                style={{ writingMode }}
+                className={`w-full h-full whitespace-pre-wrap leading-relaxed text-2xl ${theme.text} font-handwritten notebook-paper ${!boardContent && 'text-opacity-50 italic'}`}
+              >
                 {boardContent || "尚無公告內容..."}
               </div>
             )}
