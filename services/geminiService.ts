@@ -85,7 +85,10 @@ async function callGroqFallback(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model: "qwen/qwen3-32b",
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "system", content: "/no_think" },
+        { role: "user", content: prompt },
+      ],
       temperature: 0.7,
     }),
   });
@@ -96,7 +99,9 @@ async function callGroqFallback(prompt: string): Promise<string> {
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || "";
+  const content = data.choices?.[0]?.message?.content || "";
+  // 清除 Qwen3 可能殘留的 <think>...</think> 標籤
+  return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 }
 
 export const DEFAULT_SYSTEM_INSTRUCTION = `
