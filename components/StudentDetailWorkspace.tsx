@@ -97,6 +97,7 @@ export const StudentDetailWorkspace = ({
 
     for (const s of sortedStudents) {
       const dates = Object.keys(s.dailyRecords).sort();
+      let isFirstRow = true;
       for (const date of dates) {
         const record = s.dailyRecords[date];
         const hasPoints = record.points.length > 0;
@@ -131,18 +132,19 @@ export const StudentDetailWorkspace = ({
         }
 
         if (exportFields.aiComment) {
-          row.push(s.comment || '');
+          row.push(isFirstRow ? (s.comment || '') : '');
         }
 
         if (exportFields.tags) {
-          row.push(s.tags.join(', '));
+          row.push(isFirstRow ? s.tags.join(', ') : '');
         }
 
         if (exportFields.totalScore) {
-          row.push(String(s.totalScore));
+          row.push(isFirstRow ? String(s.totalScore) : '');
         }
 
         rows.push(row);
+        isFirstRow = false;
       }
     }
 
