@@ -36,6 +36,8 @@ export const WhiteboardWorkspace = ({
     { mode: 'vertical-rl', label: '直↓←' },
   ];
 
+  const paperClass = writingMode === 'horizontal-tb' ? 'notebook-paper' : 'notebook-paper-vertical';
+
   useEffect(() => {
     setBoardContent(config.class_board || '');
   }, [config.class_board]);
@@ -104,13 +106,13 @@ export const WhiteboardWorkspace = ({
                 value={boardContent}
                 onChange={(e) => setBoardContent(e.target.value)}
                 style={{ writingMode }}
-                className={`w-full h-full p-4 ${theme.inputBg} rounded-xl border ${theme.border} focus:ring-2 ${theme.focusRing} outline-none resize-none text-2xl leading-relaxed ${theme.text} font-handwritten notebook-paper`}
+                className={`w-full h-full p-4 ${theme.inputBg} rounded-xl border ${theme.border} focus:ring-2 ${theme.focusRing} outline-none resize-none text-2xl leading-relaxed ${theme.text} font-handwritten ${paperClass}`}
                 placeholder="請輸入今日事項、聯絡簿內容..."
               />
             ) : (
               <div
                 style={{ writingMode }}
-                className={`w-full h-full whitespace-pre-wrap leading-relaxed text-2xl ${theme.text} font-handwritten notebook-paper ${!boardContent && 'text-opacity-50 italic'}`}
+                className={`w-full h-full whitespace-pre-wrap leading-relaxed text-2xl ${theme.text} font-handwritten ${paperClass} ${!boardContent && 'text-opacity-50 italic'}`}
               >
                 {boardContent || "尚無公告內容..."}
               </div>

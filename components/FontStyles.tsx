@@ -22,5 +22,18 @@ export const FontStyles = () => (
     .dark .notebook-paper {
       background-image: linear-gradient(transparent 95%, #404040 95%);
     }
+
+    .notebook-paper-vertical {
+      background-color: transparent;
+      background-image: linear-gradient(to right, transparent 95%, #e5e7eb 95%);
+      background-size: 3.5rem 100%;
+      line-height: 3.5rem;
+      padding-top: 0;
+      font-weight: 700;
+    }
+
+    .dark .notebook-paper-vertical {
+      background-image: linear-gradient(to right, transparent 95%, #404040 95%);
+    }
   `}</style>
 );
