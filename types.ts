@@ -6,10 +6,15 @@ export interface PointLog {
   timestamp: number;
 }
 
+// 假別型別
+export type AbsenceType = '事假' | '病假' | '公假' | '喪假' | '不可抗力假';
+export const ABSENCE_TYPES: AbsenceType[] = ['事假', '病假', '公假', '喪假', '不可抗力假'];
+
 // 定義每日紀錄結構
 export interface DailyRecord {
   points: PointLog[];
   note: string; // 當日手寫筆記
+  absence?: AbsenceType | null; // 當日請假
 }
 
 // 定義學生資料結構

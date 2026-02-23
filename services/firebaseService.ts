@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential, User } from 'firebase/auth';
 import { db } from '../firebase';
-import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule } from '../types';
+import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule, DailyRecord, AbsenceType } from '../types';
 
 // --- Student CRUD ---
 
@@ -51,7 +51,7 @@ export const addPointToStudent = async (
   userUid: string,
   studentId: string,
   currentDate: string,
-  currentDayRecord: { points: PointLog[]; note: string },
+  currentDayRecord: DailyRecord,
   behavior: { label: string; value: number }
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
@@ -59,7 +59,7 @@ export const addPointToStudent = async (
   const updatedPoints = [...currentDayRecord.points, newPoint];
   await updateDoc(studentRef, {
     totalScore: increment(behavior.value),
-    [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note }
+    [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note, absence: currentDayRecord.absence ?? null }
   });
 };
 
@@ -67,7 +67,7 @@ export const deletePointFromStudent = async (
   userUid: string,
   studentId: string,
   currentDate: string,
-  currentDayRecord: { points: PointLog[]; note: string },
+  currentDayRecord: DailyRecord,
   pointId: string,
   pointValue: number
 ) => {
@@ -75,7 +75,7 @@ export const deletePointFromStudent = async (
   const updatedPoints = currentDayRecord.points.filter(p => p.id !== pointId);
   await updateDoc(studentRef, {
     totalScore: increment(-pointValue),
-    [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note }
+    [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note, absence: currentDayRecord.absence ?? null }
   });
 };
 
@@ -111,12 +111,29 @@ export const saveStudentNote = async (
   userUid: string,
   studentId: string,
   currentDate: string,
-  currentDayRecord: { points: PointLog[]; note: string },
+  currentDayRecord: DailyRecord,
   note: string
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
   await updateDoc(studentRef, {
-    [`dailyRecords.${currentDate}`]: { points: currentDayRecord.points, note }
+    [`dailyRecords.${currentDate}`]: { points: currentDayRecord.points, note, absence: currentDayRecord.absence ?? null }
+  });
+};
+
+export const setStudentAbsence = async (
+  userUid: string,
+  studentId: string,
+  currentDate: string,
+  currentDayRecord: DailyRecord,
+  absence: AbsenceType | null
+) => {
+  const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
+  await updateDoc(studentRef, {
+    [`dailyRecords.${currentDate}`]: {
+      points: currentDayRecord.points,
+      note: currentDayRecord.note,
+      absence,
+    }
   });
 };
 

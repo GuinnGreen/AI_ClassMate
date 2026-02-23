@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   Users, LogOut, School, Edit3, Moon, Sun,
-  Plus, Minus, Type, Sunset
+  Plus, Minus, Type, Sunset, BarChart2
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Modal } from './ui/Modal';
 import { Student } from '../types';
 import { formatDate } from '../utils/date';
+import { AbsenceStatsModal } from './AbsenceStatsModal';
 
 export const Sidebar = ({
   students,
@@ -38,6 +39,7 @@ export const Sidebar = ({
   const theme = useTheme();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showNapSettings, setShowNapSettings] = useState(false);
+  const [showAbsenceStats, setShowAbsenceStats] = useState(false);
   const [napStart, setNapStart] = useState(napTimeStart || '');
   const [napEnd, setNapEnd] = useState(napTimeEnd || '');
 
@@ -80,13 +82,22 @@ export const Sidebar = ({
         <div className="flex-1 flex flex-col min-h-0">
           <div className={`px-4 py-3 flex items-center justify-between shrink-0`}>
             <span className={`text-xs font-bold ${theme.textLight} uppercase tracking-wider`}>學生名單 ({students.length})</span>
-            <button
-              onClick={onManageStudents}
-              className={`p-1.5 rounded-lg hover:${theme.surface} transition ${theme.textLight} hover:${theme.text}`}
-              title="管理學生"
-            >
-              <Edit3 className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowAbsenceStats(true)}
+                className={`p-1.5 rounded-lg hover:${theme.surface} transition ${theme.textLight} hover:${theme.text}`}
+                title="月請假統計"
+              >
+                <BarChart2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={onManageStudents}
+                className={`p-1.5 rounded-lg hover:${theme.surface} transition ${theme.textLight} hover:${theme.text}`}
+                title="管理學生"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           <div className={`flex-1 overflow-y-auto px-3 pb-4 space-y-1 custom-scrollbar ${fontSizeLevel === 0 ? 'text-sm' :
@@ -192,6 +203,12 @@ export const Sidebar = ({
       {isMobileOpen && (
         <div className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm" onClick={() => setIsMobileOpen(false)} />
       )}
+
+      <AbsenceStatsModal
+        isOpen={showAbsenceStats}
+        onClose={() => setShowAbsenceStats(false)}
+        students={students}
+      />
 
       <Modal
         isOpen={showNapSettings}

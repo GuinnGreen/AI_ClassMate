@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ChevronLeft, Sparkles, Save, Trash2, ClipboardList,
   Smile, Frown, School, Clock, Settings, Copy, AlignLeft,
-  Check, Lock, Download
+  Check, Lock, Download, BookX
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatDate } from '../utils/date';
@@ -13,6 +13,7 @@ import {
   toggleStudentTag,
   updateStudentComment,
   saveStudentNote,
+  setStudentAbsence,
   updateCustomBehaviors,
   logAiGeneration,
   logCommentEdit,
@@ -30,6 +31,8 @@ import {
   DEFAULT_POSITIVE_BEHAVIORS,
   DEFAULT_NEGATIVE_BEHAVIORS,
   EVALUATION_CATEGORIES,
+  AbsenceType,
+  ABSENCE_TYPES,
 } from '../types';
 import { auth } from '../firebase';
 
@@ -176,7 +179,7 @@ export const StudentDetailWorkspace = ({
   };
 
   const handleAddPoint = async (behavior: BehaviorButton) => {
-    const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '' };
+    const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
     await addPointToStudent(userUid, student.id, currentDate, currentDayRecord, behavior);
   };
 
@@ -207,7 +210,7 @@ export const StudentDetailWorkspace = ({
       if (pendingAction === 'export') {
         setIsExportModalOpen(true);
       } else {
-        const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '' };
+        const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
         setTempNote(currentDayRecord.note || '');
         setIsNoteModalOpen(true);
       }
@@ -219,9 +222,17 @@ export const StudentDetailWorkspace = ({
   };
 
   const handleSaveNote = async () => {
-    const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '' };
+    const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
     await saveStudentNote(userUid, student.id, currentDate, currentDayRecord, tempNote);
     setIsNoteModalOpen(false);
+  };
+
+  const todayAbsence = (student.dailyRecords[currentDate] || { absence: null }).absence ?? null;
+
+  const handleSetAbsence = async (type: AbsenceType) => {
+    const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
+    const newAbsence = todayAbsence === type ? null : type;
+    await setStudentAbsence(userUid, student.id, currentDate, currentDayRecord, newAbsence);
   };
 
   // --- AI Logic ---
@@ -345,7 +356,7 @@ export const StudentDetailWorkspace = ({
     }
   };
 
-  const dayRecord = student.dailyRecords[currentDate] || { points: [], note: '' };
+  const dayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
   const hasNote = dayRecord.note && dayRecord.note.trim().length > 0;
 
   // Grouping logic for points
@@ -480,6 +491,27 @@ export const StudentDetailWorkspace = ({
                       <p className={`text-xs ${theme.textLight}`}>紀錄家庭狀況與隱私備註 (加密)</p>
                     }
                   </button>
+                </div>
+
+                <div className={`${theme.surface} p-4 rounded-2xl border ${theme.border} shadow-sm`}>
+                  <h3 className={`text-sm font-bold ${theme.textLight} mb-3 flex items-center gap-2`}>
+                    <BookX className="w-4 h-4" /> 今日請假
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {ABSENCE_TYPES.map(type => (
+                      <button
+                        key={type}
+                        onClick={() => handleSetAbsence(type)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border
+                          ${todayAbsence === type
+                            ? `${theme.primary} text-white border-transparent shadow`
+                            : `${theme.surfaceAlt} ${theme.textLight} ${theme.border} hover:opacity-80`
+                          }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className={`${theme.surface} p-5 rounded-2xl border ${theme.border} shadow-sm`}>
