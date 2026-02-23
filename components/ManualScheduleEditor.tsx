@@ -84,6 +84,16 @@ export const ManualScheduleEditor = ({
     setRows(newRows);
   };
 
+  const normalizePeriodName = (name: string): string => {
+    const map: Record<string, string> = {
+      '1': '第一節', '2': '第二節', '3': '第三節', '4': '第四節',
+      '5': '第五節', '6': '第六節', '7': '第七節',
+    };
+    const digit = name.match(/第(\d)節/)?.[1];
+    if (digit) return `第${'一二三四五六七'[+digit - 1]}節`;
+    return map[name.trim()] ?? name;
+  };
+
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -116,8 +126,8 @@ export const ManualScheduleEditor = ({
           if (!dayData) continue;
 
           dayData.periods.forEach((period, pIdx) => {
-            // try matching by label name first
-            const byLabel = next.find(r => !r.isLunch && period.periodName.includes(r.label));
+            const normalizedPeriodName = normalizePeriodName(period.periodName);
+            const byLabel = next.find(r => !r.isLunch && r.label === normalizedPeriodName);
             if (byLabel) {
               byLabel.subjects[dayIdx] = period.subject;
             } else if (pIdx < nonLunchRows.length) {

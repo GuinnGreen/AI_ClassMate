@@ -217,17 +217,55 @@ export const parseScheduleFromImage = async (
   mimeType: string
 ): Promise<DaySchedule[]> => {
   const prompt = `
-    請分析這張圖片，它是一張學校的課表。
-    請將其轉換為 JSON 格式，結構如下：
-    一個陣列，包含 5 個物件 (代表週一到週五)，每個物件有：
-    - "dayOfWeek": 數字 1 到 5 (1=週一, 5=週五)
-    - "periods": 一個陣列，包含當天所有節次。每個節次有：
-      - "periodName": 字串 (例如 "第一節", "08:00-08:40", "午休" 等，請盡量辨識時間或節次名稱)
-      - "subject": 字串 (科目名稱)
+你是一位台灣教育課表辨識專家。請分析這份課表（圖片或PDF），準確提取每位學生的每日課程安排。
 
-    請直接回傳純 JSON 字串，不要有 Markdown 標記 (如 \`\`\`json)。
-    如果有無法辨識的科目，請填寫 "空堂" 或保留空白。
-    請確保涵蓋週一至週五。
+【台灣國小課表結構說明】
+- 表格的「列」(rows) 代表節次（第一節到第七節，共7節）
+- 表格的「欄」(columns) 代表星期（週一到週五，可能標示為「一」「二」「三」「四」「五」）
+- 每個格子通常有「科目名稱」（較大的字）和「任課教師」（較小的字或不同顏色）
+- 請只擷取科目名稱，完全忽略教師姓名
+
+【科目名稱辨識規則】
+1. 「藝文」+細項（如「藝文表藝」「藝文音樂」「藝文美勞」）→ 只填細項（「表藝」「音樂」「美勞」）
+2. 「健體」+細項（如「健體健康」「健體體育」）→ 只填細項（「健康」「體育」）
+3. 「彈性」開頭（如「彈性閱讀」「彈性電腦」「彈性社團」「彈性作文」「彈性校訂英語」）→ 保留完整名稱
+4. 空格或無課 → 填寫空字串 ""
+
+【節次名稱規則】
+無論圖片上顯示時間或節次編號，一律輸出以下固定 periodName：
+- 第一節（對應 08:40-09:20）
+- 第二節（對應 09:30-10:10）
+- 第三節（對應 10:30-11:10）
+- 第四節（對應 11:20-12:00）
+- 第五節（對應 13:30-14:10）
+- 第六節（對應 14:20-15:00）
+- 第七節（對應 15:20-16:00）
+
+【輸出格式】
+直接輸出純 JSON 陣列，不加任何 Markdown 標記：
+[
+  {
+    "dayOfWeek": 1,
+    "periods": [
+      {"periodName": "第一節", "subject": "國語"},
+      {"periodName": "第二節", "subject": "數學"},
+      {"periodName": "第三節", "subject": "社會"},
+      {"periodName": "第四節", "subject": "社會"},
+      {"periodName": "第五節", "subject": "表藝"},
+      {"periodName": "第六節", "subject": "音樂"},
+      {"periodName": "第七節", "subject": "閱讀"}
+    ]
+  },
+  { "dayOfWeek": 2, "periods": [...] },
+  { "dayOfWeek": 3, "periods": [...] },
+  { "dayOfWeek": 4, "periods": [...] },
+  { "dayOfWeek": 5, "periods": [...] }
+]
+
+注意：
+- dayOfWeek: 1=週一, 2=週二, 3=週三, 4=週四, 5=週五
+- 每天必須有恰好 7 個 periods（第一節到第七節）
+- periodName 只能使用「第一節」到「第七節」
   `;
 
   try {
@@ -254,7 +292,8 @@ export const parseScheduleFromImage = async (
     return daySchedules;
 
   } catch (error: unknown) {
-    console.error("Schedule Parse Error:", error);
-    throw new Error("無法辨識課表，請確認圖片清晰度或手動輸入。");
+    const detail = error instanceof Error ? error.message : String(error);
+    console.error("Schedule Parse Error:", detail);
+    throw new Error(`無法辨識課表：${detail}`);
   }
 };
