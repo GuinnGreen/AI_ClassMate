@@ -1,29 +1,45 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ClipboardList, Clock, Settings, Calendar as CalendarIcon } from 'lucide-react';
+import { ClipboardList, Clock, Settings, Calendar as CalendarIcon, Minus, Plus, LayoutTemplate } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { getCurrentTime } from '../utils/date';
 import { isCurrentPeriod, getPeriodParts } from '../utils/schedule';
 import { updateClassConfig } from '../services/firebaseService';
 import { Modal } from './ui/Modal';
 import { ManualScheduleEditor } from './ManualScheduleEditor';
+import { BoardTemplateEditor } from './BoardTemplateEditor';
 import { ClassConfig, BoardWritingMode } from '../types';
+
+const clockSizeMap = [
+  { time: 'text-3xl', date: 'text-lg',  clockIcon: 'w-5 h-5', calIcon: 'w-4 h-4' },
+  { time: 'text-5xl', date: 'text-2xl', clockIcon: 'w-6 h-6', calIcon: 'w-5 h-5' },
+  { time: 'text-7xl', date: 'text-3xl', clockIcon: 'w-8 h-8', calIcon: 'w-6 h-6' },
+  { time: 'text-9xl', date: 'text-4xl', clockIcon: 'w-10 h-10', calIcon: 'w-8 h-8' },
+];
 
 export const WhiteboardWorkspace = ({
   userUid,
   config,
   onConfigUpdate,
+  clockSizeLevel = 1,
+  setClockSizeLevel,
 }: {
   userUid: string;
   config: ClassConfig;
   onConfigUpdate?: (newConfig: ClassConfig) => void;
+  clockSizeLevel?: number;
+  setClockSizeLevel?: (n: number) => void;
 }) => {
   const theme = useTheme();
+  const cs = clockSizeMap[clockSizeLevel];
   const [boardContent, setBoardContent] = useState(config.class_board || '');
   const [isEditing, setIsEditing] = useState(false);
   const [currentTime, setCurrentTime] = useState(getCurrentTime());
   const [showScheduleEditor, setShowScheduleEditor] = useState(false);
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const writingMode: BoardWritingMode = config.boardWritingMode ?? 'horizontal-tb';
   const showBoardLines = config.showBoardLines ?? true;
+
+  const activeSituation = config.activeBoardSituation ?? null;
 
   const setWritingMode = async (mode: BoardWritingMode) => {
     const newConfig = { ...config, boardWritingMode: mode };
@@ -37,6 +53,12 @@ export const WhiteboardWorkspace = ({
     await updateClassConfig(userUid, newConfig);
   };
 
+  const setActiveSituation = async (id: string | null) => {
+    const newConfig = { ...config, activeBoardSituation: id };
+    if (onConfigUpdate) onConfigUpdate(newConfig);
+    await updateClassConfig(userUid, newConfig);
+  };
+
   const writingModeOptions: { mode: BoardWritingMode; label: string }[] = [
     { mode: 'horizontal-tb', label: '橫' },
     { mode: 'vertical-lr', label: '直↓→' },
@@ -46,6 +68,10 @@ export const WhiteboardWorkspace = ({
   const paperClass = !showBoardLines
     ? ''
     : writingMode === 'horizontal-tb' ? 'notebook-paper' : 'notebook-paper-vertical';
+
+  const verticalStyle = writingMode !== 'horizontal-tb'
+    ? { writingMode, textOrientation: 'upright' as const }
+    : { writingMode };
 
   useEffect(() => {
     setBoardContent(config.class_board || '');
@@ -68,28 +94,100 @@ export const WhiteboardWorkspace = ({
     return config.weeklySchedule?.find(s => s.dayOfWeek === day);
   }, [config.weeklySchedule, currentTime.dayOfWeek]);
 
+  // Decide which template content to show in the top section
+  const templateContent = useMemo(() => {
+    if (activeSituation) {
+      return config.boardSituationTemplates?.find(t => t.id === activeSituation)?.content ?? '';
+    }
+    return config.boardDailyTemplates?.[currentTime.dayOfWeek] ?? '';
+  }, [activeSituation, config.boardSituationTemplates, config.boardDailyTemplates, currentTime.dayOfWeek]);
+
+  const hasSituationTemplates = (config.boardSituationTemplates?.length ?? 0) > 0;
+  const hasDailyTemplates = Object.values(config.boardDailyTemplates ?? {}).some(v => v?.trim());
+  const showSituationPills = hasSituationTemplates || hasDailyTemplates;
+
   return (
     <div className="flex flex-col h-full p-6 lg:p-8 overflow-hidden">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6 shrink-0">
-        <div className="flex items-baseline gap-2">
-          <Clock className={`w-6 h-6 ${theme.textLight} self-center`} />
-          <h1 className={`${theme.text} text-5xl font-extrabold tracking-tight tabular-nums`}>{currentTime.time}</h1>
+      <div className="group flex justify-between items-center mb-6 shrink-0">
+        <div className="flex items-center gap-2 relative">
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 mr-1">
+            <button
+              onClick={() => setClockSizeLevel?.(Math.max(0, clockSizeLevel - 1))}
+              disabled={clockSizeLevel === 0}
+              className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setClockSizeLevel?.(Math.min(3, clockSizeLevel + 1))}
+              disabled={clockSizeLevel === 3}
+              className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <Clock className={`${cs.clockIcon} ${theme.textLight} shrink-0`} />
+          <h1 className={`${theme.text} ${cs.time} font-extrabold tracking-tight tabular-nums leading-none`}>{currentTime.time}</h1>
         </div>
-        <div className="flex items-baseline gap-2">
-          <CalendarIcon className={`w-5 h-5 ${theme.textLight} self-center`} />
-          <p className={`${theme.text} text-2xl font-semibold tracking-wide`}>{currentTime.date}</p>
+        <div className="flex items-center gap-2">
+          <CalendarIcon className={`${cs.calIcon} ${theme.textLight} shrink-0`} />
+          <p className={`${theme.text} ${cs.date} font-semibold tracking-wide`}>{currentTime.date}</p>
         </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
         {/* Left: Whiteboard (2/3) */}
         <div className={`flex-[2] ${theme.surface} rounded-3xl border ${theme.border} shadow-sm overflow-hidden flex flex-col`}>
-          <div className={`p-6 border-b ${theme.border} flex justify-between items-center ${theme.surfaceAlt}`}>
-            <h3 className={`text-lg font-bold ${theme.text} flex items-center gap-2`}>
+
+          {/* Board toolbar */}
+          <div className={`p-4 border-b ${theme.border} flex flex-wrap justify-between items-center gap-2 ${theme.surfaceAlt}`}>
+            <h3 className={`text-lg font-bold ${theme.text} flex items-center gap-2 shrink-0`}>
               <ClipboardList className="w-5 h-5" /> 班級公告欄
             </h3>
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Situation pills (only visible when templates exist) */}
+              {showSituationPills && (
+                <div className="flex items-center gap-1 flex-wrap">
+                  {/* 今日 pill */}
+                  <button
+                    onClick={() => setActiveSituation(null)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition border ${
+                      activeSituation === null
+                        ? `${theme.primary} text-white border-transparent`
+                        : `${theme.surface} ${theme.text} ${theme.border} hover:opacity-80`
+                    }`}
+                  >
+                    今日
+                  </button>
+                  {/* Situation template pills */}
+                  {config.boardSituationTemplates?.map(sit => (
+                    <button
+                      key={sit.id}
+                      onClick={() => setActiveSituation(sit.id)}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition border ${
+                        activeSituation === sit.id
+                          ? `${theme.primary} text-white border-transparent`
+                          : `${theme.surface} ${theme.text} ${theme.border} hover:opacity-80`
+                      }`}
+                    >
+                      {sit.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Template editor button */}
+              <button
+                onClick={() => setShowTemplateEditor(true)}
+                className={`p-2 rounded-lg border ${theme.border} ${theme.surface} hover:opacity-80 transition ${theme.textLight}`}
+                title="編輯模板"
+              >
+                <LayoutTemplate className="w-4 h-4" />
+              </button>
+
+              {/* Lines toggle */}
               <button
                 onClick={toggleLines}
                 className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition ${
@@ -101,6 +199,8 @@ export const WhiteboardWorkspace = ({
               >
                 ≡
               </button>
+
+              {/* Writing mode */}
               <div className={`flex rounded-lg border ${theme.border} overflow-hidden text-xs font-bold`}>
                 {writingModeOptions.map(({ mode, label }) => (
                   <button
@@ -112,6 +212,8 @@ export const WhiteboardWorkspace = ({
                   </button>
                 ))}
               </div>
+
+              {/* Edit / Save daily notes */}
               <button
                 onClick={() => isEditing ? saveBoard() : setIsEditing(true)}
                 className={`px-4 py-2 rounded-xl font-bold text-sm transition ${isEditing ? `${theme.primary} text-white` : `${theme.surface} ${theme.text} border ${theme.border}`}`}
@@ -120,23 +222,55 @@ export const WhiteboardWorkspace = ({
               </button>
             </div>
           </div>
-          <div className={`flex-1 p-6 relative ${writingMode !== 'horizontal-tb' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-y-auto'}`}>
-            {isEditing ? (
-              <textarea
-                value={boardContent}
-                onChange={(e) => setBoardContent(e.target.value)}
-                style={{ writingMode }}
-                className={`w-full h-full p-4 ${theme.inputBg} rounded-xl border ${theme.border} focus:ring-2 ${theme.focusRing} outline-none resize-none text-2xl leading-relaxed ${theme.text} font-handwritten ${paperClass}`}
-                placeholder="請輸入今日事項、聯絡簿內容..."
-              />
-            ) : (
+
+          {/* Board body */}
+          <div className={`flex-1 flex flex-col min-h-0 ${writingMode !== 'horizontal-tb' ? 'flex-row overflow-x-auto' : 'overflow-hidden'}`}>
+
+            {/* Template section (top) — only shown when there is content */}
+            {templateContent ? (
               <div
-                style={{ writingMode }}
-                className={`w-full h-full whitespace-pre-wrap leading-relaxed text-2xl ${theme.text} font-handwritten ${paperClass} ${!boardContent && 'text-opacity-50 italic'}`}
+                className={`${writingMode !== 'horizontal-tb' ? 'overflow-y-auto border-r' : 'overflow-x-auto border-b'} ${theme.border} ${theme.surfaceAlt} shrink-0`}
+                style={{ flex: '2' }}
               >
-                {boardContent || "尚無公告內容..."}
+                <div
+                  className={`p-5 h-full`}
+                  style={writingMode !== 'horizontal-tb' ? { minHeight: '100%' } : {}}
+                >
+                  <div
+                    style={verticalStyle}
+                    className={`whitespace-pre-wrap leading-relaxed text-xl ${theme.text} font-handwritten opacity-80 ${paperClass} w-full h-full`}
+                  >
+                    {templateContent}
+                  </div>
+                </div>
               </div>
-            )}
+            ) : null}
+
+            {/* Daily notes section (bottom / main) */}
+            <div
+              className={`${writingMode !== 'horizontal-tb' ? 'overflow-y-auto' : 'overflow-y-auto'} relative`}
+              style={{ flex: '3' }}
+            >
+              <div className="p-5 h-full">
+                {isEditing ? (
+                  <textarea
+                    value={boardContent}
+                    onChange={(e) => setBoardContent(e.target.value)}
+                    style={verticalStyle}
+                    className={`w-full h-full p-4 ${theme.inputBg} rounded-xl border ${theme.border} focus:ring-2 ${theme.focusRing} outline-none resize-none text-2xl leading-relaxed ${theme.text} font-handwritten ${paperClass}`}
+                    placeholder="請輸入今日事項、聯絡簿內容..."
+                  />
+                ) : (
+                  <div
+                    style={verticalStyle}
+                    onClick={() => setIsEditing(true)}
+                    className={`w-full h-full whitespace-pre-wrap leading-relaxed text-2xl ${theme.text} font-handwritten ${paperClass} cursor-text ${!boardContent && `${theme.textLight} italic`}`}
+                  >
+                    {boardContent || "點此輸入今日事項..."}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -192,6 +326,7 @@ export const WhiteboardWorkspace = ({
         </div>
       </div>
 
+      {/* Schedule Editor Modal */}
       <Modal
         isOpen={showScheduleEditor}
         onClose={() => setShowScheduleEditor(false)}
@@ -206,6 +341,21 @@ export const WhiteboardWorkspace = ({
             await updateClassConfig(userUid, newConfig);
             setShowScheduleEditor(false);
           }}
+        />
+      </Modal>
+
+      {/* Template Editor Modal */}
+      <Modal
+        isOpen={showTemplateEditor}
+        onClose={() => setShowTemplateEditor(false)}
+        title="編輯公告模板"
+        maxWidth="max-w-2xl"
+      >
+        <BoardTemplateEditor
+          config={config}
+          userUid={userUid}
+          onConfigUpdate={onConfigUpdate}
+          onClose={() => setShowTemplateEditor(false)}
         />
       </Modal>
     </div>

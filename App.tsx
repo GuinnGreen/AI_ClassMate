@@ -32,6 +32,7 @@ export default function App() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [fontSizeLevel, setFontSizeLevel] = useState(1);
+  const [clockSizeLevel, setClockSizeLevel] = useState(1);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const napAutoActiveRef = useRef(false);
   const preNapDarkRef = useRef(false);
@@ -234,6 +235,8 @@ export default function App() {
                   userUid={user!.uid}
                   config={classConfig}
                   onConfigUpdate={setClassConfig}
+                  clockSizeLevel={clockSizeLevel}
+                  setClockSizeLevel={setClockSizeLevel}
                 />
               )}
             </div>

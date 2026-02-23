@@ -47,6 +47,13 @@ export interface DaySchedule {
   periods: Period[];
 }
 
+// --- 公告欄情境模板 ---
+export interface BoardSituationTemplate {
+  id: string;
+  name: string;    // e.g. "老師請假"
+  content: string;
+}
+
 // 定義全班設定 (電子白板 + 自訂行為 + 課表)
 export interface ClassConfig {
   class_board: string;
@@ -59,6 +66,9 @@ export interface ClassConfig {
   napTimeStart?: string; // 午休開始時間 (HH:MM)
   napTimeEnd?: string;   // 午休結束時間 (HH:MM)
   showBoardLines?: boolean; // 公告欄是否顯示底線（預設 true）
+  boardDailyTemplates?: Partial<Record<number, string>>; // key=dayOfWeek(1=Mon…5=Fri)
+  boardSituationTemplates?: BoardSituationTemplate[];    // 教師自訂情境模板
+  activeBoardSituation?: string | null;                 // null=今日 day template；非空=情境id
 }
 
 export const DEFAULT_POSITIVE_BEHAVIORS: BehaviorButton[] = [
