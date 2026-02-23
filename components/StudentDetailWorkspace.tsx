@@ -591,7 +591,7 @@ export const StudentDetailWorkspace = ({
                               <button
                                 key={tag}
                                 onClick={() => handleToggleTag(tag)}
-                                className={`px-2.5 py-1.5 rounded-lg text-sm font-bold transition-all border-2 w-full text-center
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border-2 w-full text-center
                                     ${student.tags.includes(tag)
                                     ? `${theme.primary} border-${theme.primary} text-white shadow-md transform scale-105`
                                     : `border-transparent bg-white dark:bg-black/10 ${theme.text} hover:border-${theme.primary}`
@@ -613,7 +613,7 @@ export const StudentDetailWorkspace = ({
                               <button
                                 key={tag}
                                 onClick={() => handleToggleTag(tag)}
-                                className={`px-2.5 py-1.5 rounded-lg text-sm font-bold transition-all border-2 w-full text-center
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border-2 w-full text-center
                                     ${student.tags.includes(tag)
                                     ? `${theme.accentNegative} border-${theme.accentNegative} text-white shadow-md transform scale-105`
                                     : `border-transparent bg-white dark:bg-black/10 ${theme.text} hover:border-${theme.accentNegative}`
