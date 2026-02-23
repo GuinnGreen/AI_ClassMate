@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Save } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Save, Camera, Loader2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { DaySchedule, Period } from '../types';
+import { parseScheduleFromImage } from '../services/geminiService';
 
 interface EditorRow {
   id: string;
@@ -31,6 +32,9 @@ export const ManualScheduleEditor = ({
 }) => {
   const theme = useTheme();
   const [rows, setRows] = useState<EditorRow[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const newRows: EditorRow[] = ROW_CONFIG.map((cfg, idx) => ({
@@ -80,6 +84,57 @@ export const ManualScheduleEditor = ({
     setRows(newRows);
   };
 
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    setIsImporting(true);
+    setImportError('');
+
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // strip data URL prefix
+          resolve(result.split(',')[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const parsed = await parseScheduleFromImage(base64, file.type);
+
+      setRows(prev => {
+        const next = prev.map(row => ({ ...row, subjects: [...row.subjects] }));
+        const nonLunchRows = next.filter(r => !r.isLunch);
+
+        for (let dayIdx = 0; dayIdx < 5; dayIdx++) {
+          const dayOfWeek = dayIdx + 1;
+          const dayData = parsed.find(d => d.dayOfWeek === dayOfWeek);
+          if (!dayData) continue;
+
+          dayData.periods.forEach((period, pIdx) => {
+            // try matching by label name first
+            const byLabel = next.find(r => !r.isLunch && period.periodName.includes(r.label));
+            if (byLabel) {
+              byLabel.subjects[dayIdx] = period.subject;
+            } else if (pIdx < nonLunchRows.length) {
+              // fallback: positional
+              nonLunchRows[pIdx].subjects[dayIdx] = period.subject;
+            }
+          });
+        }
+        return next;
+      });
+    } catch (err: unknown) {
+      setImportError(err instanceof Error ? err.message : '辨識失敗，請重試。');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleSave = () => {
     const schedule: DaySchedule[] = [];
     for (let day = 1; day <= 5; day++) {
@@ -103,6 +158,26 @@ export const ManualScheduleEditor = ({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <label className={`flex items-center gap-2 px-4 py-2 rounded-xl cursor-pointer font-semibold text-sm border ${theme.border} ${theme.surfaceAlt} ${theme.text} hover:opacity-80 transition ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
+          {isImporting
+            ? <Loader2 className="w-4 h-4 animate-spin" />
+            : <Camera className="w-4 h-4" />}
+          {isImporting ? '辨識中...' : '📷 拍照 / 上傳 PDF 自動辨識'}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            onChange={handleFileImport}
+            disabled={isImporting}
+          />
+        </label>
+        {importError && (
+          <span className="text-red-500 text-sm">{importError}</span>
+        )}
+      </div>
+
       <div className={`overflow-x-auto border ${theme.border} rounded-xl`}>
         <table className="w-full text-sm min-w-[600px]">
           <thead className={`${theme.surfaceAccent} font-bold ${theme.text}`}>

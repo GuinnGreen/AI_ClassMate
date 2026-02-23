@@ -233,7 +233,7 @@ export const parseScheduleFromImage = async (
   try {
     const daySchedules = await callWithRetry("parseScheduleFromImage", async (client) => {
       const response = await client.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-2.0-flash',
         contents: {
           parts: [
             { inlineData: { mimeType, data: base64Data } },
