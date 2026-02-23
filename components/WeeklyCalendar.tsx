@@ -90,8 +90,8 @@ export const WeeklyCalendar = ({
                   {hasNegative && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-[#e6bwbw]' : theme.accentNegative}`}></div>}
                 </div>
                 {hasNote && (
-                  <div className="absolute top-1 right-1">
-                    <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : theme.textLight}`}></div>
+                  <div className="absolute top-0.5 right-0.5">
+                    <div className={`w-3 h-3 rounded-full ring-2 ring-white ${isSelected ? 'bg-white/80' : 'bg-amber-400'}`}></div>
                   </div>
                 )}
               </button>

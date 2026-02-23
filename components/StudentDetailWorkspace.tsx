@@ -562,12 +562,12 @@ export const StudentDetailWorkspace = ({
                     <h3 className={`text-xl font-bold ${theme.text} mb-4 flex items-center gap-3`}><div className={`p-2 rounded-xl ${theme.primary} text-white`}><ClipboardList className="w-5 h-5" /></div> 特質標籤</h3>
 
                     {/* Tabs */}
-                    <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+                    <div className="flex gap-2 mb-4">
                       {EVALUATION_CATEGORIES.map((cat, idx) => (
                         <button
                           key={idx}
                           onClick={() => setActiveEvaluationTab(idx)}
-                          className={`px-4 py-2 rounded-xl text-sm font-bold transition whitespace-nowrap
+                          className={`flex-1 px-2 py-2 rounded-xl text-sm font-bold transition text-center
                             ${activeEvaluationTab === idx
                               ? `${theme.primary} text-white shadow-md`
                               : `${theme.surfaceAlt} ${theme.textLight} hover:${theme.text}`
@@ -586,12 +586,12 @@ export const StudentDetailWorkspace = ({
                           <h4 className={`text-sm font-bold ${theme.text} mb-3 flex items-center gap-2`}>
                             <div className={`w-2 h-2 rounded-full ${theme.accentPositive}`}></div> 正向特質
                           </h4>
-                          <div className="flex flex-wrap gap-1.5">
+                          <div className="grid grid-cols-2 gap-1.5">
                             {EVALUATION_CATEGORIES[activeEvaluationTab]?.positive.map(tag => (
                               <button
                                 key={tag}
                                 onClick={() => handleToggleTag(tag)}
-                                className={`px-2.5 py-1.5 rounded-lg text-sm font-bold transition-all border-2 w-full md:w-auto text-left md:text-center
+                                className={`px-2.5 py-1.5 rounded-lg text-sm font-bold transition-all border-2 w-full text-center
                                     ${student.tags.includes(tag)
                                     ? `${theme.primary} border-${theme.primary} text-white shadow-md transform scale-105`
                                     : `border-transparent bg-white dark:bg-black/10 ${theme.text} hover:border-${theme.primary}`
@@ -608,12 +608,12 @@ export const StudentDetailWorkspace = ({
                           <h4 className={`text-sm font-bold ${theme.text} mb-3 flex items-center gap-2`}>
                             <div className={`w-2 h-2 rounded-full ${theme.accentNegative}`}></div> 待改進
                           </h4>
-                          <div className="flex flex-wrap gap-1.5">
+                          <div className="grid grid-cols-2 gap-1.5">
                             {EVALUATION_CATEGORIES[activeEvaluationTab]?.negative.map(tag => (
                               <button
                                 key={tag}
                                 onClick={() => handleToggleTag(tag)}
-                                className={`px-2.5 py-1.5 rounded-lg text-sm font-bold transition-all border-2 w-full md:w-auto text-left md:text-center
+                                className={`px-2.5 py-1.5 rounded-lg text-sm font-bold transition-all border-2 w-full text-center
                                     ${student.tags.includes(tag)
                                     ? `${theme.accentNegative} border-${theme.accentNegative} text-white shadow-md transform scale-105`
                                     : `border-transparent bg-white dark:bg-black/10 ${theme.text} hover:border-${theme.accentNegative}`
