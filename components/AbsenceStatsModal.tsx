@@ -34,11 +34,11 @@ export const AbsenceStatsModal = ({
   const rows = [...students]
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     .map(student => {
-      const counts: AbsenceCount = { '事假': 0, '病假': 0, '公假': 0, '喪假': 0, '不可抗力假': 0 };
+      const counts = Object.fromEntries(ABSENCE_TYPES.map(t => [t, 0])) as AbsenceCount;
       Object.entries(student.dailyRecords)
         .filter(([date]) => date.startsWith(monthPrefix))
         .forEach(([, record]) => {
-          if (record.absence != null) {
+          if (record.absence != null && record.absence in counts) {
             counts[record.absence] = (counts[record.absence] ?? 0) + 1;
           }
         });
@@ -47,6 +47,12 @@ export const AbsenceStatsModal = ({
     });
 
   const hasAnyAbsence = rows.some(r => r.total > 0);
+
+  // 各假別請假人數（班級統計）
+  const studentCountByType = Object.fromEntries(
+    ABSENCE_TYPES.map(t => [t, rows.filter(r => r.counts[t] > 0).length])
+  ) as AbsenceCount;
+  const totalAbsenceStudents = rows.filter(r => r.total > 0).length;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="月請假統計" maxWidth="max-w-2xl">
@@ -100,6 +106,19 @@ export const AbsenceStatsModal = ({
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className={`border-t-2 ${theme.border} ${theme.surfaceAlt} font-bold`}>
+                  <td colSpan={2} className={`px-3 py-2 text-right text-xs ${theme.textLight}`}>請假人數</td>
+                  {ABSENCE_TYPES.map(t => (
+                    <td key={t} className={`px-3 py-2 text-center ${studentCountByType[t] > 0 ? 'text-orange-600' : theme.textLight}`}>
+                      {studentCountByType[t] > 0 ? `${studentCountByType[t]} 人` : '—'}
+                    </td>
+                  ))}
+                  <td className={`px-3 py-2 text-center ${totalAbsenceStudents > 0 ? 'text-orange-600' : theme.textLight}`}>
+                    {totalAbsenceStudents > 0 ? `${totalAbsenceStudents} 人` : '—'}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}

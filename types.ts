@@ -7,8 +7,8 @@ export interface PointLog {
 }
 
 // 假別型別
-export type AbsenceType = '事假' | '病假' | '公假' | '喪假' | '不可抗力假';
-export const ABSENCE_TYPES: AbsenceType[] = ['事假', '病假', '公假', '喪假', '不可抗力假'];
+export type AbsenceType = '事假' | '病假' | '公假' | '喪假';
+export const ABSENCE_TYPES: AbsenceType[] = ['事假', '病假', '公假', '喪假'];
 
 // 定義每日紀錄結構
 export interface DailyRecord {
