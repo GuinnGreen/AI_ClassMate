@@ -6,6 +6,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import { Modal } from './ui/Modal';
 import { Student } from '../types';
+import { formatDate } from '../utils/date';
 
 export const Sidebar = ({
   students,
@@ -44,6 +45,8 @@ export const Sidebar = ({
     setNapStart(napTimeStart || '');
     setNapEnd(napTimeEnd || '');
   }, [napTimeStart, napTimeEnd]);
+
+  const today = formatDate(new Date());
 
   return (
     <>
@@ -90,36 +93,50 @@ export const Sidebar = ({
             fontSizeLevel === 1 ? 'text-base' :
               fontSizeLevel === 2 ? 'text-lg' : 'text-xl'
             }`}>
-            {students.map(student => (
-              <button
-                key={student.id}
-                onClick={() => {
-                  onSelectStudent(student.id);
-                  setIsMobileOpen(false);
-                }}
-                className={`
-                  w-full text-left p-3 rounded-xl transition-all duration-200 flex items-center justify-between group
-                  ${selectedStudentId === student.id
-                    ? `${theme.surface} shadow-md border ${theme.border} ${theme.text}`
-                    : `hover:${theme.surface} hover:shadow-sm ${theme.textLight} hover:${theme.text}`}
-                `}
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className={`
-                    w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors shrink-0
-                    ${selectedStudentId === student.id ? `${theme.primary} text-white` : `${theme.surfaceAccent} ${theme.textLight}`}
-                  `}>
-                    {student.name.charAt(0)}
+            {students.map(student => {
+              const todayScore = student.dailyRecords[today]?.points.reduce((sum, p) => sum + p.value, 0) ?? 0;
+              return (
+                <button
+                  key={student.id}
+                  onClick={() => {
+                    onSelectStudent(student.id);
+                    setIsMobileOpen(false);
+                  }}
+                  className={`
+                    w-full text-left p-3 rounded-xl transition-all duration-200 flex items-center justify-between group
+                    ${selectedStudentId === student.id
+                      ? `${theme.surface} shadow-md border ${theme.border} ${theme.text}`
+                      : `hover:${theme.surface} hover:shadow-sm ${theme.textLight} hover:${theme.text}`}
+                  `}
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className={`
+                      w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors shrink-0
+                      ${selectedStudentId === student.id ? `${theme.primary} text-white` : `${theme.surfaceAccent} ${theme.textLight}`}
+                    `}>
+                      {student.seatNumber ?? student.order ?? '?'}
+                    </div>
+                    <span className="font-bold truncate">{student.name}</span>
                   </div>
-                  <span className="font-bold truncate">{student.name}</span>
-                </div>
-                {student.totalScore !== 0 && (
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-md shrink-0 ${student.totalScore > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {student.totalScore > 0 ? '+' : ''}{student.totalScore}
-                  </span>
-                )}
-              </button>
-            ))}
+                  <div className="flex flex-row items-center gap-1 shrink-0">
+                    <div className="w-10 flex justify-end">
+                      {todayScore !== 0 && (
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${todayScore > 0 ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                          {todayScore > 0 ? '+' : ''}{todayScore}
+                        </span>
+                      )}
+                    </div>
+                    <div className="w-10 flex justify-end">
+                      {student.totalScore !== 0 && (
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${student.totalScore > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {student.totalScore > 0 ? '+' : ''}{student.totalScore}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 

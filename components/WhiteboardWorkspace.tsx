@@ -23,9 +23,16 @@ export const WhiteboardWorkspace = ({
   const [currentTime, setCurrentTime] = useState(getCurrentTime());
   const [showScheduleEditor, setShowScheduleEditor] = useState(false);
   const writingMode: BoardWritingMode = config.boardWritingMode ?? 'horizontal-tb';
+  const showBoardLines = config.showBoardLines ?? true;
 
   const setWritingMode = async (mode: BoardWritingMode) => {
     const newConfig = { ...config, boardWritingMode: mode };
+    if (onConfigUpdate) onConfigUpdate(newConfig);
+    await updateClassConfig(userUid, newConfig);
+  };
+
+  const toggleLines = async () => {
+    const newConfig = { ...config, showBoardLines: !showBoardLines };
     if (onConfigUpdate) onConfigUpdate(newConfig);
     await updateClassConfig(userUid, newConfig);
   };
@@ -36,7 +43,9 @@ export const WhiteboardWorkspace = ({
     { mode: 'vertical-rl', label: '直↓←' },
   ];
 
-  const paperClass = writingMode === 'horizontal-tb' ? 'notebook-paper' : 'notebook-paper-vertical';
+  const paperClass = !showBoardLines
+    ? ''
+    : writingMode === 'horizontal-tb' ? 'notebook-paper' : 'notebook-paper-vertical';
 
   useEffect(() => {
     setBoardContent(config.class_board || '');
@@ -81,6 +90,17 @@ export const WhiteboardWorkspace = ({
               <ClipboardList className="w-5 h-5" /> 班級公告欄
             </h3>
             <div className="flex items-center gap-2">
+              <button
+                onClick={toggleLines}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition ${
+                  showBoardLines
+                    ? `${theme.primary} text-white border-transparent`
+                    : `${theme.surface} ${theme.text} ${theme.border}`
+                }`}
+                title="顯示/隱藏底線"
+              >
+                ≡
+              </button>
               <div className={`flex rounded-lg border ${theme.border} overflow-hidden text-xs font-bold`}>
                 {writingModeOptions.map(({ mode, label }) => (
                   <button

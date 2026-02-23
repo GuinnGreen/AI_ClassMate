@@ -370,7 +370,7 @@ export const StudentDetailWorkspace = ({
         <div className={`flex items-center justify-between p-6 border-b ${theme.border} z-20 shrink-0`}>
           <div className="flex items-center gap-4">
             <button onClick={onBack} className={`p-2 hover:${theme.surfaceAlt} rounded-full lg:hidden ${theme.text}`}><ChevronLeft className="w-5 h-5" /></button>
-            <div className={`w-12 h-12 rounded-full ${theme.primary} text-white flex items-center justify-center font-bold text-xl shadow-sm`}>{student.name.charAt(0)}</div>
+            <div className={`w-12 h-12 rounded-full ${theme.primary} text-white flex items-center justify-center font-bold text-base shadow-sm`}>{student.seatNumber ?? student.order ?? '?'}</div>
             <div>
               <h2 className={`text-2xl font-bold ${theme.text}`}>{student.name}</h2>
               <div className={`text-base ${theme.textLight} flex items-center gap-2`}>

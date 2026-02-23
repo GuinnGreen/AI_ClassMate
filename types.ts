@@ -16,6 +16,7 @@ export interface DailyRecord {
 export interface Student {
   id: string; // Firestore Document ID
   name: string;
+  seatNumber?: number; // 座號
   totalScore: number;
   order?: number; // 排序欄位，用於維持匯入順序
   // Key 為日期字串 "YYYY-MM-DD"
@@ -57,6 +58,7 @@ export interface ClassConfig {
   boardWritingMode?: BoardWritingMode; // 公告欄書寫方向
   napTimeStart?: string; // 午休開始時間 (HH:MM)
   napTimeEnd?: string;   // 午休結束時間 (HH:MM)
+  showBoardLines?: boolean; // 公告欄是否顯示底線（預設 true）
 }
 
 export const DEFAULT_POSITIVE_BEHAVIORS: BehaviorButton[] = [

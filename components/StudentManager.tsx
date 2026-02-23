@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckSquare, Square, Trash2, Edit3, Check } from 'lucide-react';
+import { CheckSquare, Square, Trash2, Edit3, Check, Hash } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Student } from '../types';
 
@@ -8,19 +8,23 @@ export const StudentManager = ({
   onClose,
   onDelete,
   onUpdateName,
+  onUpdateSeatNumber,
 }: {
   students: Student[];
   onClose: () => void;
   onDelete: (ids: string[]) => void;
   onUpdateName: (id: string, newName: string) => void;
+  onUpdateSeatNumber: (id: string, seatNumber: number) => void;
 }) => {
   const theme = useTheme();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [editingSeatId, setEditingSeatId] = useState<string | null>(null);
+  const [editSeatNum, setEditSeatNum] = useState('');
 
   const toggleSelect = (id: string) => {
-    if (editingId) return;
+    if (editingId || editingSeatId) return;
     const newSet = new Set(selectedIds);
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
@@ -29,6 +33,7 @@ export const StudentManager = ({
 
   const startEdit = (e: React.MouseEvent, student: Student) => {
     e.stopPropagation();
+    setEditingSeatId(null);
     setEditingId(student.id);
     setEditName(student.name);
   };
@@ -38,6 +43,21 @@ export const StudentManager = ({
       onUpdateName(id, editName.trim());
     }
     setEditingId(null);
+  };
+
+  const startSeatEdit = (e: React.MouseEvent, student: Student) => {
+    e.stopPropagation();
+    setEditingId(null);
+    setEditingSeatId(student.id);
+    setEditSeatNum(String(student.seatNumber ?? student.order ?? ''));
+  };
+
+  const saveSeatEdit = (id: string) => {
+    const num = parseInt(editSeatNum, 10);
+    if (!isNaN(num) && num >= 1) {
+      onUpdateSeatNumber(id, num);
+    }
+    setEditingSeatId(null);
   };
 
   const handleSelectAll = () => {
@@ -73,9 +93,24 @@ export const StudentManager = ({
             className={`p-3 rounded-xl border ${selectedIds.has(student.id) ? `${theme.primary} border-transparent text-white` : `${theme.border} ${theme.surface} hover:${theme.surfaceAlt}`} flex items-center justify-between cursor-pointer transition`}
           >
             <div className="flex items-center gap-3 flex-1">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${selectedIds.has(student.id) ? 'bg-white/20' : `${theme.primary} text-white`}`}>
-                {student.name.charAt(0)}
-              </div>
+              {editingSeatId === student.id ? (
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editSeatNum}
+                    onChange={e => setEditSeatNum(e.target.value)}
+                    className="w-14 p-1 px-2 rounded bg-white text-black text-sm outline-none border-2 border-blue-400 text-center"
+                    autoFocus
+                    onKeyDown={e => { if (e.key === 'Enter') saveSeatEdit(student.id); if (e.key === 'Escape') setEditingSeatId(null); }}
+                  />
+                  <button onClick={() => saveSeatEdit(student.id)} className="p-1.5 bg-green-500 text-white rounded hover:bg-green-600"><Check className="w-4 h-4" /></button>
+                </div>
+              ) : (
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${selectedIds.has(student.id) ? 'bg-white/20' : `${theme.primary} text-white`}`}>
+                  {student.seatNumber ?? student.order ?? '?'}
+                </div>
+              )}
 
               {editingId === student.id ? (
                 <div className="flex-1 flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -94,15 +129,25 @@ export const StudentManager = ({
               )}
             </div>
 
-            {!editingId && (
-              <div className="flex items-center gap-2">
+            {!editingId && !editingSeatId && (
+              <div className="flex items-center gap-1">
                 {selectedIds.has(student.id) ? <Check className="w-5 h-5" /> : (
-                  <button
-                    onClick={(e) => startEdit(e, student)}
-                    className={`p-2 rounded-full hover:bg-black/10 transition ${theme.textLight} hover:${theme.text}`}
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
+                  <>
+                    <button
+                      onClick={(e) => startSeatEdit(e, student)}
+                      className={`p-2 rounded-full hover:bg-black/10 transition ${theme.textLight} hover:${theme.text}`}
+                      title="編輯座號"
+                    >
+                      <Hash className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => startEdit(e, student)}
+                      className={`p-2 rounded-full hover:bg-black/10 transition ${theme.textLight} hover:${theme.text}`}
+                      title="編輯姓名"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                  </>
                 )}
               </div>
             )}

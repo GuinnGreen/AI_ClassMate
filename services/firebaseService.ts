@@ -125,6 +125,11 @@ export const updateStudentName = async (userUid: string, studentId: string, newN
   await updateDoc(ref, { name: newName });
 };
 
+export const updateStudentSeatNumber = async (userUid: string, studentId: string, seatNumber: number) => {
+  const ref = doc(db, `users/${userUid}/students/${studentId}`);
+  await updateDoc(ref, { seatNumber });
+};
+
 export const importStudents = async (userUid: string, names: string[], existingCount: number) => {
   const batch = writeBatch(db);
   names.forEach((name, idx) => {
@@ -133,6 +138,7 @@ export const importStudents = async (userUid: string, names: string[], existingC
       id: newRef.id,
       name,
       order: existingCount + idx + 1,
+      seatNumber: existingCount + idx + 1,
       totalScore: 0,
       tags: [],
       comment: '',

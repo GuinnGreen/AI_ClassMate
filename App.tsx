@@ -9,6 +9,7 @@ import {
   subscribeToStudents,
   subscribeToConfig,
   updateStudentName,
+  updateStudentSeatNumber,
   importStudents,
   deleteStudents,
   updateClassConfig,
@@ -150,6 +151,11 @@ export default function App() {
     }
   };
 
+  const handleUpdateStudentSeatNumber = async (id: string, seatNumber: number) => {
+    if (!user) return;
+    await updateStudentSeatNumber(user.uid, id, seatNumber);
+  };
+
   const handleImportStudents = async (names: string[]) => {
     if (!user) return;
     await importStudents(user.uid, names, students.length);
@@ -264,6 +270,7 @@ export default function App() {
                   setShowDeleteAuth(true);
                 }}
                 onUpdateName={handleUpdateStudentName}
+                onUpdateSeatNumber={handleUpdateStudentSeatNumber}
               />
             ) : (
               <StudentImporter onImport={handleImportStudents} />
