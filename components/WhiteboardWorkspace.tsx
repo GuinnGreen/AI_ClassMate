@@ -10,10 +10,10 @@ import { BoardTemplateEditor } from './BoardTemplateEditor';
 import { ClassConfig, BoardWritingMode } from '../types';
 
 const clockSizeMap = [
-  { time: 'text-3xl', date: 'text-lg',  clockIcon: 'w-5 h-5', calIcon: 'w-4 h-4' },
-  { time: 'text-5xl', date: 'text-2xl', clockIcon: 'w-6 h-6', calIcon: 'w-5 h-5' },
-  { time: 'text-7xl', date: 'text-3xl', clockIcon: 'w-8 h-8', calIcon: 'w-6 h-6' },
-  { time: 'text-9xl', date: 'text-4xl', clockIcon: 'w-10 h-10', calIcon: 'w-8 h-8' },
+  { time: 'text-xl lg:text-3xl',   date: 'text-sm lg:text-lg',  clockIcon: 'w-4 h-4 lg:w-5 lg:h-5', calIcon: 'w-3 h-3 lg:w-4 lg:h-4' },
+  { time: 'text-3xl lg:text-5xl',  date: 'text-base lg:text-2xl', clockIcon: 'w-5 h-5 lg:w-6 lg:h-6', calIcon: 'w-4 h-4 lg:w-5 lg:h-5' },
+  { time: 'text-5xl lg:text-7xl',  date: 'text-xl lg:text-3xl', clockIcon: 'w-6 h-6 lg:w-8 lg:h-8', calIcon: 'w-5 h-5 lg:w-6 lg:h-6' },
+  { time: 'text-7xl lg:text-9xl',  date: 'text-2xl lg:text-4xl', clockIcon: 'w-8 h-8 lg:w-10 lg:h-10', calIcon: 'w-6 h-6 lg:w-8 lg:h-8' },
 ];
 
 const boardFontSizeMap = [

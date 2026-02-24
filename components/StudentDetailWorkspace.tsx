@@ -378,13 +378,13 @@ export const StudentDetailWorkspace = ({
   return (
     <>
       <div className={`flex flex-col h-full ${theme.surface} rounded-3xl overflow-hidden`}>
-        <div className={`flex items-center justify-between p-6 border-b ${theme.border} z-20 shrink-0`}>
+        <div className={`flex flex-wrap items-center justify-between gap-3 p-3 lg:p-6 border-b ${theme.border} z-20 shrink-0`}>
           <div className="flex items-center gap-4">
             <button onClick={onBack} className={`p-2 hover:${theme.surfaceAlt} rounded-full lg:hidden ${theme.text}`}><ChevronLeft className="w-5 h-5" /></button>
-            <div className={`w-12 h-12 rounded-full ${theme.primary} text-white flex items-center justify-center font-bold text-base shadow-sm`}>{student.seatNumber ?? student.order ?? '?'}</div>
+            <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full ${theme.primary} text-white flex items-center justify-center font-bold text-base shadow-sm`}>{student.seatNumber ?? student.order ?? '?'}</div>
             <div>
-              <h2 className={`text-2xl font-bold ${theme.text}`}>{student.name}</h2>
-              <div className={`text-base ${theme.textLight} flex items-center gap-2`}>
+              <h2 className={`text-lg lg:text-2xl font-bold ${theme.text}`}>{student.name}</h2>
+              <div className={`text-sm lg:text-base ${theme.textLight} flex items-center gap-2`}>
                 總積分 <span className={`px-2 py-0.5 rounded-lg text-sm font-bold ${student.totalScore >= 0 ? `${theme.accentPositive} text-white` : `${theme.accentNegative} text-white`}`}>{student.totalScore > 0 ? '+' : ''}{student.totalScore}</span>
               </div>
             </div>
@@ -396,11 +396,11 @@ export const StudentDetailWorkspace = ({
               title="輔導紀錄"
             >
               {hasNote ? <Check className={`w-4 h-4 ${theme.primaryText}`} /> : <Lock className="w-4 h-4" />}
-              輔導紀錄
+              <span className="hidden lg:inline">輔導紀錄</span>
             </button>
             <div className={`flex ${theme.surfaceAlt} p-1.5 rounded-xl`}>
-              <button onClick={() => setMode('daily')} className={`px-5 py-2 text-sm font-bold rounded-lg transition ${mode === 'daily' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}>日常紀錄</button>
-              <button onClick={() => setMode('ai')} className={`px-5 py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><Sparkles className="w-4 h-4" /> AI 評語</button>
+              <button onClick={() => setMode('daily')} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition ${mode === 'daily' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}>日常紀錄</button>
+              <button onClick={() => setMode('ai')} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><Sparkles className="w-4 h-4" /> AI 評語</button>
             </div>
             <button
               onClick={() => { setPendingAction('export'); setShowPasswordModal(true); }}
@@ -416,22 +416,22 @@ export const StudentDetailWorkspace = ({
         <div className="flex-1 relative overflow-hidden">
           {mode === 'daily' ? (
             <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
-              <div className={`flex-1 flex flex-col border-r ${theme.border} ${theme.bg} p-6 h-auto lg:h-full lg:overflow-y-auto shrink-0`}>
-                <div className="mb-6 shrink-0">
+              <div className={`flex-1 flex flex-col border-r ${theme.border} ${theme.bg} p-3 lg:p-6 h-auto lg:h-full lg:overflow-y-auto shrink-0`}>
+                <div className="mb-3 lg:mb-6 shrink-0">
                   <WeeklyCalendar currentDate={currentDate} onDateSelect={setCurrentDate} student={student} />
                 </div>
 
                 <div className="flex-1 flex flex-col min-h-[400px] lg:min-h-0">
                   <h3 className={`font-bold ${theme.text} mb-2 shrink-0`}>當日紀錄</h3>
-                  <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
-                    <div className={`rounded-2xl p-4 border ${theme.border} ${theme.surface} h-fit`}>
+                  <div className="flex-1 grid grid-cols-2 gap-3 lg:gap-4 min-h-0">
+                    <div className={`rounded-2xl p-3 lg:p-4 border ${theme.border} ${theme.surface} h-fit`}>
                       <h4 className={`text-sm font-bold mb-3 flex items-center gap-2 ${theme.text}`}><div className={`w-2 h-2 rounded-full ${theme.accentPositive}`}></div> 正面表現</h4>
                       <div className="space-y-2">
                         {positiveGroups.map((group, idx) => (
                           <button
                             key={idx}
                             onClick={() => handleDeleteGroup(group.label)}
-                            className={`w-full ${theme.surfaceAlt} p-3 rounded-xl border ${theme.border} flex justify-between items-center group animate-pop-in hover:border-${theme.primary} transition-all duration-75 relative active:scale-95 transform`}
+                            className={`w-full ${theme.surfaceAlt} p-2 lg:p-3 rounded-xl border ${theme.border} flex justify-between items-center group animate-pop-in hover:border-${theme.primary} transition-all duration-75 relative active:scale-95 transform`}
                             title="點擊刪除一筆"
                           >
                             <span className={`font-bold text-sm ${theme.text}`}>{group.label}</span>
@@ -448,14 +448,14 @@ export const StudentDetailWorkspace = ({
                       </div>
                     </div>
 
-                    <div className={`rounded-2xl p-4 border ${theme.border} ${theme.surface} h-fit`}>
+                    <div className={`rounded-2xl p-3 lg:p-4 border ${theme.border} ${theme.surface} h-fit`}>
                       <h4 className={`text-sm font-bold mb-3 flex items-center gap-2 ${theme.text}`}><div className={`w-2 h-2 rounded-full ${theme.accentNegative}`}></div> 待改進</h4>
                       <div className="space-y-2">
                         {negativeGroups.map((group, idx) => (
                           <button
                             key={idx}
                             onClick={() => handleDeleteGroup(group.label)}
-                            className={`w-full ${theme.surfaceAlt} p-3 rounded-xl border ${theme.border} flex justify-between items-center group animate-pop-in hover:border-${theme.accentNegative} transition-all duration-75 relative active:scale-95 transform`}
+                            className={`w-full ${theme.surfaceAlt} p-2 lg:p-3 rounded-xl border ${theme.border} flex justify-between items-center group animate-pop-in hover:border-${theme.accentNegative} transition-all duration-75 relative active:scale-95 transform`}
                             title="點擊刪除一筆"
                           >
                             <span className={`font-bold text-sm ${theme.text}`}>{group.label}</span>
@@ -475,7 +475,7 @@ export const StudentDetailWorkspace = ({
                 </div>
               </div>
 
-              <div className={`w-full lg:w-96 flex flex-col gap-4 p-6 shrink-0 h-auto lg:h-full lg:overflow-y-auto lg:border-l ${theme.border} ${theme.surfaceAlt}`}>
+              <div className={`w-full lg:w-96 flex flex-col gap-3 lg:gap-4 p-3 lg:p-6 shrink-0 h-auto lg:h-full lg:overflow-y-auto lg:border-l ${theme.border} ${theme.surfaceAlt}`}>
                 <div className={`${theme.surface} p-4 rounded-2xl border ${theme.border} shadow-sm flex items-center justify-between`}>
                   <h3 className={`text-sm font-bold ${theme.textLight} uppercase tracking-wide flex items-center gap-2`}>
                     <Clock className="w-4 h-4" /> 快速記分板
@@ -506,13 +506,13 @@ export const StudentDetailWorkspace = ({
                   </div>
                 </div>
 
-                <div className={`${theme.surface} p-5 rounded-2xl border ${theme.border} shadow-sm`}>
+                <div className={`${theme.surface} p-3 lg:p-5 rounded-2xl border ${theme.border} shadow-sm`}>
                   <label className={`text-sm font-bold ${theme.primaryText} mb-4 flex items-center gap-2`}><Smile className="w-4 h-4" /> 正面表現</label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2 lg:gap-3">
                     {positiveBehaviors.map((btn) => (
                       <button key={btn.id} onClick={() => handleAddPoint(btn)}
                         className={`
-                            flex flex-col items-center justify-center p-4 rounded-2xl
+                            flex flex-col items-center justify-center p-3 lg:p-4 rounded-2xl
                             border ${theme.border} ${theme.surfaceAlt}
                             hover:${theme.primary} hover:text-white hover:border-transparent hover:shadow-lg hover:-translate-y-1
                             transition-all duration-200 active:scale-95 group relative overflow-hidden active-shrink
@@ -525,13 +525,13 @@ export const StudentDetailWorkspace = ({
                   </div>
                 </div>
 
-                <div className={`${theme.surface} p-5 rounded-2xl border ${theme.border} shadow-sm`}>
+                <div className={`${theme.surface} p-3 lg:p-5 rounded-2xl border ${theme.border} shadow-sm`}>
                   <label className={`text-sm font-bold ${theme.accentNegativeText} mb-4 flex items-center gap-2`}><Frown className="w-4 h-4" /> 待改進</label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2 lg:gap-3">
                     {negativeBehaviors.map((btn) => (
                       <button key={btn.id} onClick={() => handleAddPoint(btn)}
                         className={`
-                            flex flex-col items-center justify-center p-4 rounded-2xl
+                            flex flex-col items-center justify-center p-3 lg:p-4 rounded-2xl
                             border ${theme.border} ${theme.surfaceAlt}
                             hover:${theme.accentNegative} hover:text-white hover:border-transparent hover:shadow-lg hover:-translate-y-1
                             transition-all duration-200 active:scale-95 group relative overflow-hidden active-shrink
@@ -547,11 +547,11 @@ export const StudentDetailWorkspace = ({
             </div>
           ) : (
             // AI Mode View
-            <div className="flex flex-col h-full overflow-y-auto p-6 lg:p-12 max-w-6xl mx-auto w-full">
-              <div className="grid lg:grid-cols-2 gap-8 h-full">
-                <div className="space-y-8">
-                  <div className={`${theme.surface} p-8 rounded-3xl shadow-sm border ${theme.border}`}>
-                    <h3 className={`text-xl font-bold ${theme.text} mb-4 flex items-center gap-3`}><div className={`p-2 rounded-xl ${theme.primary} text-white`}><ClipboardList className="w-5 h-5" /></div> 特質標籤</h3>
+            <div className="flex flex-col h-full overflow-y-auto p-3 lg:p-12 max-w-6xl mx-auto w-full">
+              <div className="grid lg:grid-cols-2 gap-4 lg:gap-8 h-full">
+                <div className="space-y-4 lg:space-y-8">
+                  <div className={`${theme.surface} p-4 lg:p-8 rounded-3xl shadow-sm border ${theme.border}`}>
+                    <h3 className={`text-base lg:text-xl font-bold ${theme.text} mb-4 flex items-center gap-3`}><div className={`p-2 rounded-xl ${theme.primary} text-white`}><ClipboardList className="w-5 h-5" /></div> 特質標籤</h3>
 
                     {/* Tabs */}
                     <div className="flex gap-2 mb-4">
@@ -630,10 +630,10 @@ export const StudentDetailWorkspace = ({
 
                   </div>
 
-                  <div className={`${theme.inputBg} p-6 rounded-3xl border ${theme.border} relative overflow-hidden`}>
+                  <div className={`${theme.inputBg} p-4 lg:p-6 rounded-3xl border ${theme.border} relative overflow-hidden`}>
                     <div className="relative z-10">
                       <div className="flex justify-between items-center mb-4">
-                        <h3 className={`text-xl font-bold ${theme.text}`}>準備生成</h3>
+                        <h3 className={`text-base lg:text-xl font-bold ${theme.text}`}>準備生成</h3>
                         <button onClick={() => setIsPromptModalOpen(true)} className={`p-2 rounded-lg ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} hover:bg-[rgba(0,0,0,0.05)] transition flex items-center gap-2 text-xs font-bold`}>
                           <Settings className="w-4 h-4" /> 自訂提示詞 Prompt
                         </button>
@@ -648,10 +648,10 @@ export const StudentDetailWorkspace = ({
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col h-full min-h-[500px]">
-                  <div className={`flex-1 ${theme.surface} p-8 rounded-3xl shadow-sm border ${theme.border} flex flex-col relative`}>
+                <div className="flex flex-col h-full min-h-[300px] lg:min-h-[500px]">
+                  <div className={`flex-1 ${theme.surface} p-4 lg:p-8 rounded-3xl shadow-sm border ${theme.border} flex flex-col relative`}>
                     <label className={`text-sm font-bold ${theme.textLight} mb-4 block flex items-center gap-2`}><School className="w-4 h-4" /> AI 生成結果</label>
-                    <textarea value={tempComment} onChange={(e) => setTempComment(e.target.value)} readOnly={isTyping} placeholder={isGenerating ? '等待 AI 回應中...' : '評語將顯示於此...'} className={`flex-1 w-full p-6 ${theme.inputBg} rounded-2xl border ${theme.border} outline-none focus:ring-2 ${theme.focusRing} transition leading-8 ${theme.text} resize-none text-lg ${isTyping ? 'cursor-default' : ''}`} />
+                    <textarea value={tempComment} onChange={(e) => setTempComment(e.target.value)} readOnly={isTyping} placeholder={isGenerating ? '等待 AI 回應中...' : '評語將顯示於此...'} className={`flex-1 w-full p-4 lg:p-6 ${theme.inputBg} rounded-2xl border ${theme.border} outline-none focus:ring-2 ${theme.focusRing} transition leading-8 ${theme.text} resize-none text-lg ${isTyping ? 'cursor-default' : ''}`} />
                     <div className="absolute bottom-6 right-6 flex items-center gap-3 animate-pop-in">
                       {tempComment && (
                         <button
