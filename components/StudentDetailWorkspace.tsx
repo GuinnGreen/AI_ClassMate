@@ -760,7 +760,7 @@ export const StudentDetailWorkspace = ({
                           }}
                           className="w-4 h-4 rounded accent-current"
                         />
-                        <span className={`font-bold text-sm ${theme.text}`}>{(s.order ?? 0) + 1}. {s.name}</span>
+                        <span className={`font-bold text-sm ${theme.text}`}>{s.seatNumber ?? s.order ?? '?'}. {s.name}</span>
                         {targetNote && (
                           <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full font-bold">已有紀錄，將追加</span>
                         )}
