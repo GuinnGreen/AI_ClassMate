@@ -3,6 +3,9 @@ import { Save, Camera, Loader2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { DaySchedule, Period } from '../types';
 import { parseScheduleFromImage } from '../services/geminiService';
+import * as pdfjsLib from 'pdfjs-dist';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 interface EditorRow {
   id: string;
@@ -103,18 +106,37 @@ export const ManualScheduleEditor = ({
     setImportError('');
 
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          // strip data URL prefix
-          resolve(result.split(',')[1]);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      let base64: string;
+      let mimeType: string;
 
-      const parsed = await parseScheduleFromImage(base64, file.type);
+      if (file.type === 'application/pdf') {
+        // PDF → Canvas → PNG（Groq/OpenRouter 不支援 PDF）
+        console.log('[課表辨識] 偵測到 PDF，轉換為 PNG...');
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d')!;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        const dataUrl = canvas.toDataURL('image/png');
+        base64 = dataUrl.split(',')[1];
+        mimeType = 'image/png';
+        console.log('[課表辨識] PDF 轉 PNG 完成');
+      } else {
+        // 圖片：直接讀 base64
+        base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        mimeType = file.type;
+      }
+
+      const parsed = await parseScheduleFromImage(base64, mimeType);
 
       setRows(prev => {
         const next = prev.map(row => ({ ...row, subjects: [...row.subjects] }));

@@ -325,6 +325,7 @@ export const parseScheduleFromImage = async (
     }
   }
 
+  const VISION_SUPPORTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
   const errors: string[] = [];
 
   // --- Layer 1: Gemini ---
@@ -351,7 +352,7 @@ export const parseScheduleFromImage = async (
   }
 
   // --- Layer 2: Groq Vision ---
-  if (GROQ_API_KEY) {
+  if (GROQ_API_KEY && VISION_SUPPORTED_TYPES.includes(mimeType)) {
     try {
       console.warn("[課表辨識] 嘗試 Groq Vision 備援...");
       const text = await callOpenAICompatibleVision(
@@ -369,10 +370,13 @@ export const parseScheduleFromImage = async (
       console.warn("[課表辨識] Groq Vision 失敗:", detail);
       errors.push(`Groq Vision: ${detail}`);
     }
+  } else if (GROQ_API_KEY) {
+    console.warn(`[課表辨識] Groq Vision 不支援 ${mimeType}，跳過`);
+    errors.push(`Groq Vision: 不支援 ${mimeType} 格式`);
   }
 
   // --- Layer 3: OpenRouter ---
-  if (OPENROUTER_API_KEY) {
+  if (OPENROUTER_API_KEY && VISION_SUPPORTED_TYPES.includes(mimeType)) {
     try {
       console.warn("[課表辨識] 嘗試 OpenRouter 備援...");
       const text = await callOpenAICompatibleVision(
@@ -390,6 +394,9 @@ export const parseScheduleFromImage = async (
       console.warn("[課表辨識] OpenRouter 失敗:", detail);
       errors.push(`OpenRouter: ${detail}`);
     }
+  } else if (OPENROUTER_API_KEY) {
+    console.warn(`[課表辨識] OpenRouter 不支援 ${mimeType}，跳過`);
+    errors.push(`OpenRouter: 不支援 ${mimeType} 格式`);
   }
 
   // 全部失敗
