@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Safe area insets for iPhone Dynamic Island / notch / status bar */
+#root {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+}
+
 /* Custom scrollbar for cleaner look */
 ::-webkit-scrollbar {
   width: 8px;

@@ -175,12 +175,12 @@ export default function App() {
   };
 
   if (!user && !loading) return <ErrorBoundary><FontStyles /><Login /></ErrorBoundary>;
-  if (loading) return <div className={`h-screen flex items-center justify-center ${theme.bg} ${theme.text}`}>載入資料中...</div>;
+  if (loading) return <div className={`h-dvh flex items-center justify-center ${theme.bg} ${theme.text}`}>載入資料中...</div>;
 
   return (
     <ErrorBoundary>
       <ThemeProvider value={theme}>
-        <div className={`flex h-screen w-full pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${theme.bg} font-sans ${getFontSizeClass()} transition-colors duration-300`}>
+        <div className={`flex h-dvh w-full ${theme.bg} font-sans ${getFontSizeClass()} transition-colors duration-300`}>
           <FontStyles />
           <Sidebar
             students={students}
