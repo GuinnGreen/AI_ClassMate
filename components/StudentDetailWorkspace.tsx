@@ -55,6 +55,7 @@ export const StudentDetailWorkspace = ({
   const theme = useTheme();
   const { canGenerate, cooldownRemaining, dailyUsageCount, dailyLimit, isLimitReached, recordGeneration } = useAiRateLimit({ userUid });
   const [mode, setMode] = useState<'daily' | 'ai'>('daily');
+  const [mobileTab, setMobileTab] = useState<'record' | 'scoring'>('scoring');
   const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
 
   // Note & Security State
@@ -476,7 +477,24 @@ export const StudentDetailWorkspace = ({
                   <WeeklyCalendar currentDate={currentDate} onDateSelect={setCurrentDate} student={student} />
                 </div>
 
-                <div className="flex-1 flex flex-col min-h-[400px] lg:min-h-0">
+                <div className={`flex ${theme.surfaceAlt} p-1.5 rounded-xl mb-3 lg:hidden`}>
+                  <button
+                    onClick={() => setMobileTab('record')}
+                    className={`flex-1 px-3 py-1.5 text-sm font-bold rounded-lg transition flex items-center justify-center gap-1.5
+                      ${mobileTab === 'record' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight}`}`}
+                  >
+                    <ClipboardList className="w-4 h-4" /> 當日紀錄
+                  </button>
+                  <button
+                    onClick={() => setMobileTab('scoring')}
+                    className={`flex-1 px-3 py-1.5 text-sm font-bold rounded-lg transition flex items-center justify-center gap-1.5
+                      ${mobileTab === 'scoring' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight}`}`}
+                  >
+                    <Clock className="w-4 h-4" /> 快速計分板
+                  </button>
+                </div>
+
+                <div className={`flex-1 flex flex-col min-h-[400px] lg:min-h-0 ${mobileTab !== 'record' ? 'hidden lg:flex' : ''}`}>
                   <h3 className={`font-bold ${theme.text} mb-2 shrink-0`}>當日紀錄</h3>
                   <div className="flex-1 grid grid-cols-2 gap-3 lg:gap-4 min-h-0">
                     <div className={`rounded-2xl p-3 lg:p-4 border ${theme.border} ${theme.surface} h-fit`}>
@@ -530,7 +548,7 @@ export const StudentDetailWorkspace = ({
                 </div>
               </div>
 
-              <div className={`w-full lg:w-96 flex flex-col gap-3 lg:gap-4 p-3 lg:p-6 shrink-0 h-auto lg:h-full lg:overflow-y-auto lg:border-l ${theme.border} ${theme.surfaceAlt}`}>
+              <div className={`w-full lg:w-96 flex flex-col gap-3 lg:gap-4 p-3 lg:p-6 shrink-0 h-auto lg:h-full lg:overflow-y-auto lg:border-l ${theme.border} ${theme.surfaceAlt} ${mobileTab !== 'scoring' ? 'hidden lg:flex' : ''}`}>
                 <div className={`${theme.surface} p-4 rounded-2xl border ${theme.border} shadow-sm flex items-center justify-between`}>
                   <h3 className={`text-sm font-bold ${theme.textLight} uppercase tracking-wide flex items-center gap-2`}>
                     <Clock className="w-4 h-4" /> 快速記分板
