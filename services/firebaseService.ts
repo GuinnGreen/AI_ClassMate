@@ -10,6 +10,8 @@ import {
   writeBatch,
   addDoc,
   getDocs,
+  query,
+  where,
 } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential, User } from 'firebase/auth';
 import { db } from '../firebase';
@@ -224,6 +226,25 @@ export const logAiGeneration = async (
     timestamp: Date.now(),
     lengthSetting,
     hasCustomPrompt
+  });
+};
+
+// 查詢今日 AI 使用次數（rate limiting 用）
+export const getTodayAiGenerationCount = async (userUid: string): Promise<number> => {
+  const logRef = collection(db, `users/${userUid}/logs`);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const q = query(logRef, where('timestamp', '>=', startOfToday.getTime()));
+  const snapshot = await getDocs(q);
+  return snapshot.size;
+};
+
+// 記錄課表辨識使用（與 logAiGeneration 同 collection）
+export const logScheduleRecognition = async (userUid: string) => {
+  const logRef = collection(db, `users/${userUid}/logs`);
+  await addDoc(logRef, {
+    type: 'schedule_recognize',
+    timestamp: Date.now(),
   });
 };
 

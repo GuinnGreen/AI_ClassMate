@@ -3,6 +3,8 @@ import { Save, Camera, Loader2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { DaySchedule, Period } from '../types';
 import { parseScheduleFromImage } from '../services/geminiService';
+import { useAiRateLimit } from '../hooks/useAiRateLimit';
+import { logScheduleRecognition } from '../services/firebaseService';
 import * as pdfjsLib from 'pdfjs-dist';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -29,11 +31,14 @@ const ROW_CONFIG = [
 export const ManualScheduleEditor = ({
   initialSchedule,
   onSave,
+  userUid,
 }: {
   initialSchedule?: DaySchedule[];
   onSave: (schedule: DaySchedule[]) => void;
+  userUid: string;
 }) => {
   const theme = useTheme();
+  const { canGenerate, cooldownRemaining, isLimitReached, dailyUsageCount, dailyLimit, recordGeneration } = useAiRateLimit({ userUid });
   const [rows, setRows] = useState<EditorRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState('');
@@ -163,6 +168,8 @@ export const ManualScheduleEditor = ({
         }
         return next;
       });
+      await logScheduleRecognition(userUid);
+      recordGeneration();
     } catch (err: unknown) {
       setImportError(err instanceof Error ? err.message : '辨識失敗，請重試。');
     } finally {
@@ -197,18 +204,21 @@ export const ManualScheduleEditor = ({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <label className={`flex items-center gap-2 px-4 py-2 rounded-xl cursor-pointer font-semibold text-sm border ${theme.border} ${theme.surfaceAlt} ${theme.text} hover:opacity-80 transition ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
+        <label className={`flex items-center gap-2 px-4 py-2 rounded-xl cursor-pointer font-semibold text-sm border ${theme.border} ${theme.surfaceAlt} ${theme.text} hover:opacity-80 transition ${isImporting || !canGenerate ? 'opacity-50 pointer-events-none' : ''}`}>
           {isImporting
             ? <Loader2 className="w-4 h-4 animate-spin" />
             : <Camera className="w-4 h-4" />}
-          {isImporting ? '辨識中...' : '📷 拍照 / 上傳 PDF 自動辨識'}
+          {isImporting ? '辨識中...'
+            : isLimitReached ? `今日已達上限 (${dailyUsageCount}/${dailyLimit})`
+            : cooldownRemaining > 0 ? `冷卻中 (${cooldownRemaining}s)`
+            : '📷 拍照 / 上傳 PDF 自動辨識'}
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*,application/pdf"
             className="hidden"
             onChange={handleFileImport}
-            disabled={isImporting}
+            disabled={isImporting || !canGenerate}
           />
         </label>
         {importError && (

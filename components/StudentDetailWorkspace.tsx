@@ -35,6 +35,7 @@ import {
   ABSENCE_TYPES,
 } from '../types';
 import { auth } from '../firebase';
+import { useAiRateLimit } from '../hooks/useAiRateLimit';
 
 export const StudentDetailWorkspace = ({
   userUid,
@@ -52,6 +53,7 @@ export const StudentDetailWorkspace = ({
   onConfigUpdate?: (config: ClassConfig) => void;
 }) => {
   const theme = useTheme();
+  const { canGenerate, cooldownRemaining, dailyUsageCount, dailyLimit, isLimitReached, recordGeneration } = useAiRateLimit({ userUid });
   const [mode, setMode] = useState<'daily' | 'ai'>('daily');
   const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
 
@@ -340,6 +342,7 @@ export const StudentDetailWorkspace = ({
       setOriginalAiText(generatedText);
       await updateStudentComment(userUid, student.id, generatedText, generatedText);
       await logAiGeneration(userUid, student.id, commentLength, !!customPrompt);
+      recordGeneration();
     } catch (err: unknown) {
       clearTimers();
       setGenerationStage('');
@@ -670,9 +673,24 @@ export const StudentDetailWorkspace = ({
                         </button>
                       </div>
                       <p className={`text-base ${theme.textLight} mb-6`}>系統將讀取該生所有資料作為 AI 上下文。</p>
-                      <button onClick={handleGenerateAI} disabled={isGenerating || isTyping} className={`w-full py-4 ${theme.primary} text-white rounded-2xl font-bold shadow-lg hover:opacity-90 hover:shadow-xl transition disabled:opacity-50 flex items-center justify-center gap-2 transform hover:-translate-y-0.5`}>
-                        {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> 生成評語中...</> : isTyping ? <><Sparkles className="w-5 h-5 animate-spin" /> 輸出中...</> : <><Sparkles className="w-5 h-5" /> 立即生成期末評語</>}
+                      <button onClick={handleGenerateAI} disabled={isGenerating || isTyping || !canGenerate} className={`w-full py-4 ${theme.primary} text-white rounded-2xl font-bold shadow-lg hover:opacity-90 hover:shadow-xl transition disabled:opacity-50 flex items-center justify-center gap-2 transform hover:-translate-y-0.5`}>
+                        {isGenerating ? (
+                          <><Sparkles className="w-5 h-5 animate-spin" /> 生成評語中...</>
+                        ) : isTyping ? (
+                          <><Sparkles className="w-5 h-5 animate-spin" /> 輸出中...</>
+                        ) : isLimitReached ? (
+                          <><Sparkles className="w-5 h-5" /> 今日已達上限 ({dailyUsageCount}/{dailyLimit})</>
+                        ) : cooldownRemaining > 0 ? (
+                          <><Sparkles className="w-5 h-5" /> 冷卻中 ({cooldownRemaining}s)</>
+                        ) : (
+                          <><Sparkles className="w-5 h-5" /> 立即生成期末評語</>
+                        )}
                       </button>
+                      {dailyUsageCount > 0 && !isLimitReached && (
+                        <p className={`text-xs ${theme.textLight} text-center mt-2`}>
+                          今日已使用 {dailyUsageCount}/{dailyLimit} 次
+                        </p>
+                      )}
                       {generationStage && (
                         <p className={`text-sm ${theme.textLight} text-center mt-3 animate-pulse`}>{generationStage}</p>
                       )}

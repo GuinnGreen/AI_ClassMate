@@ -441,6 +441,7 @@ export const WhiteboardWorkspace = ({
       >
         <ManualScheduleEditor
           initialSchedule={config.weeklySchedule}
+          userUid={userUid}
           onSave={async (newSchedule) => {
             const newConfig = { ...config, weeklySchedule: newSchedule };
             if (onConfigUpdate) onConfigUpdate(newConfig);
