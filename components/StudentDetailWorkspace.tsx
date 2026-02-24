@@ -405,7 +405,7 @@ export const StudentDetailWorkspace = ({
   return (
     <>
       <div className={`flex flex-col h-full ${theme.surface} rounded-3xl overflow-hidden`}>
-        <div className={`flex flex-wrap items-center justify-between gap-3 p-3 lg:p-6 border-b ${theme.border} z-20 shrink-0`}>
+        <div className={`flex flex-nowrap items-center justify-between gap-3 p-3 lg:p-6 border-b ${theme.border} z-20 shrink-0 overflow-x-auto`}>
           <div className="flex items-center gap-4">
             <button onClick={onBack} className={`p-2 hover:${theme.surfaceAlt} rounded-full lg:hidden ${theme.text}`}><ChevronLeft className="w-5 h-5" /></button>
             <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full ${theme.primary} text-white flex items-center justify-center font-bold text-base shadow-sm`}>{student.seatNumber ?? student.order ?? '?'}</div>
@@ -416,7 +416,7 @@ export const StudentDetailWorkspace = ({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 lg:gap-2 flex-nowrap">
             {/* 今日請假 */}
             <div className={`flex items-center gap-1 ${theme.surfaceAlt} p-1.5 rounded-xl`}>
               <BookX className={`w-4 h-4 ${theme.textLight} ml-1`} />
@@ -424,13 +424,14 @@ export const StudentDetailWorkspace = ({
                 <button
                   key={type}
                   onClick={() => handleSetAbsence(type)}
-                  className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all
+                  className={`px-2 py-1.5 lg:px-2.5 text-xs font-bold rounded-lg transition-all
                     ${todayAbsence === type
                       ? `${theme.primary} text-white shadow`
                       : `${theme.textLight} hover:${theme.text}`
                     }`}
                 >
-                  {type}
+                  <span className="lg:hidden">{type[0]}</span>
+                  <span className="hidden lg:inline">{type}</span>
                 </button>
               ))}
             </div>
@@ -443,8 +444,8 @@ export const StudentDetailWorkspace = ({
               <span className="hidden lg:inline">輔導紀錄</span>
             </button>
             <div className={`flex ${theme.surfaceAlt} p-1.5 rounded-xl`}>
-              <button onClick={() => setMode('daily')} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition ${mode === 'daily' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}>日常紀錄</button>
-              <button onClick={() => setMode('ai')} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><Sparkles className="w-4 h-4" /> AI 評語</button>
+              <button onClick={() => setMode('daily')} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'daily' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><ClipboardList className="w-4 h-4 lg:hidden" /><span className="hidden lg:inline">日常紀錄</span></button>
+              <button onClick={() => setMode('ai')} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><Sparkles className="w-4 h-4" /><span className="hidden lg:inline">AI 評語</span></button>
             </div>
             <button
               onClick={() => { setPendingAction('export'); setShowPasswordModal(true); }}
