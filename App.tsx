@@ -180,7 +180,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider value={theme}>
-        <div className={`flex h-screen w-full ${theme.bg} font-sans ${getFontSizeClass()} transition-colors duration-300`}>
+        <div className={`flex h-screen w-full pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ${theme.bg} font-sans ${getFontSizeClass()} transition-colors duration-300`}>
           <FontStyles />
           <Sidebar
             students={students}

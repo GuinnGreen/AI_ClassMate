@@ -49,10 +49,13 @@ export const ManualScheduleEditor = ({
     }));
 
     if (initialSchedule && initialSchedule.length > 0) {
+      const wedAfternoonLabels = ['第五節', '第六節', '第七節'];
       newRows.forEach((row) => {
         let foundTime = "";
 
         for (let day = 1; day <= 5; day++) {
+          // 週三下午不載入
+          if (day === 3 && wedAfternoonLabels.includes(row.label)) continue;
           const dayData = initialSchedule.find(d => d.dayOfWeek === day);
           if (dayData) {
             const period = dayData.periods.find(p => p.periodName.includes(row.label));
@@ -169,9 +172,12 @@ export const ManualScheduleEditor = ({
 
   const handleSave = () => {
     const schedule: DaySchedule[] = [];
+    const wedAfternoonLabels = ['第五節', '第六節', '第七節'];
     for (let day = 1; day <= 5; day++) {
       const periods: Period[] = [];
       rows.forEach(row => {
+        const isWedAfternoon = day === 3 && wedAfternoonLabels.includes(row.label);
+        if (isWedAfternoon) return; // 週三下午不排課，跳過
         const subject = row.isLunch ? "午休" : row.subjects[day - 1];
         const userTime = row.periodName.replace(row.label, '').trim();
         const finalName = userTime
@@ -251,15 +257,22 @@ export const ManualScheduleEditor = ({
                     — 午 休 時 間 —
                   </td>
                 ) : (
-                  [0, 1, 2, 3, 4].map(day => (
-                    <td key={day} className={`p-2 border-l ${theme.border}`}>
-                      <input
-                        value={row.subjects[day]}
-                        onChange={(e) => handleSubjectChange(idx, day, e.target.value)}
-                        className={`w-full text-center bg-transparent outline-none focus:font-bold ${theme.text}`}
-                      />
-                    </td>
-                  ))
+                  [0, 1, 2, 3, 4].map(day => {
+                    const isWedAfternoon = day === 2 && ['第五節', '第六節', '第七節'].includes(row.label);
+                    return (
+                      <td key={day} className={`p-2 border-l ${theme.border} ${isWedAfternoon ? 'bg-gray-100 dark:bg-gray-800/50' : ''}`}>
+                        {isWedAfternoon ? (
+                          <span className={`block w-full text-center text-xs ${theme.textLight} select-none`}>—</span>
+                        ) : (
+                          <input
+                            value={row.subjects[day]}
+                            onChange={(e) => handleSubjectChange(idx, day, e.target.value)}
+                            className={`w-full text-center bg-transparent outline-none focus:font-bold ${theme.text}`}
+                          />
+                        )}
+                      </td>
+                    );
+                  })
                 )}
               </tr>
             ))}

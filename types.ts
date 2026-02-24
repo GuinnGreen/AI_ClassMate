@@ -72,6 +72,7 @@ export interface ClassConfig {
   napTimeEnd?: string;   // 午休結束時間 (HH:MM)
   showBoardLines?: boolean; // 公告欄是否顯示底線（預設 true）
   boardFontSizeLevel?: number; // 0-3, 預設 1
+  scheduleFontSizeLevel?: number; // 0-3, 預設 1
   boardDailyTemplates?: Partial<Record<number, string>>; // key=dayOfWeek(1=Mon…5=Fri)
   boardSituationTemplates?: BoardSituationTemplate[];    // 教師自訂情境模板
   activeBoardSituation?: string | null;                 // null=今日 day template；非空=情境id

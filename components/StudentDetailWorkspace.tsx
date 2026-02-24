@@ -58,6 +58,9 @@ export const StudentDetailWorkspace = ({
   // Note & Security State
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [tempNote, setTempNote] = useState('');
+  const [noteSyncMode, setNoteSyncMode] = useState(false);
+  const [syncTargetIds, setSyncTargetIds] = useState<Set<string>>(new Set());
+  const [isSyncing, setIsSyncing] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [verifyPasswordVal, setVerifyPasswordVal] = useState('');
   const [verifyError, setVerifyError] = useState('');
@@ -224,6 +227,30 @@ export const StudentDetailWorkspace = ({
   const handleSaveNote = async () => {
     const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
     await saveStudentNote(userUid, student.id, currentDate, currentDayRecord, tempNote);
+    setNoteSyncMode(true);
+  };
+
+  const handleCloseNoteModal = () => {
+    setIsNoteModalOpen(false);
+    setNoteSyncMode(false);
+    setSyncTargetIds(new Set());
+  };
+
+  const handleSyncNote = async () => {
+    setIsSyncing(true);
+    for (const targetId of syncTargetIds) {
+      const target = students.find(s => s.id === targetId);
+      if (!target) continue;
+      const targetDayRecord = target.dailyRecords[currentDate] || { points: [], note: '', absence: null };
+      const existingNote = targetDayRecord.note?.trim() || '';
+      const mergedNote = existingNote
+        ? `${existingNote}\n---\n${tempNote}`
+        : tempNote;
+      await saveStudentNote(userUid, targetId, currentDate, targetDayRecord, mergedNote);
+    }
+    setIsSyncing(false);
+    setNoteSyncMode(false);
+    setSyncTargetIds(new Set());
     setIsNoteModalOpen(false);
   };
 
@@ -680,14 +707,79 @@ export const StudentDetailWorkspace = ({
         </div>
       </div>
 
-      <Modal isOpen={isNoteModalOpen} onClose={() => setIsNoteModalOpen(false)} title="🔒 輔導紀錄">
+      <Modal isOpen={isNoteModalOpen} onClose={handleCloseNoteModal} title="🔒 輔導紀錄">
         <div className="space-y-4">
-          <p className={`text-sm ${theme.textLight} ${theme.surfaceAlt} p-3 rounded-xl border ${theme.border}`}>此內容僅供教師查看，可紀錄家庭狀況、輔導需求等隱私資訊。</p>
-          <textarea className={`w-full h-48 p-4 ${theme.inputBg} border ${theme.border} rounded-xl focus:ring-2 ${theme.focusRing} outline-none resize-none text-base ${theme.text}`} placeholder="請輸入私密觀察紀錄..." value={tempNote} onChange={(e) => setTempNote(e.target.value)} />
-          <div className="flex gap-2 pt-2">
-            <button onClick={handleSaveNote} className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90`}>儲存</button>
-            <button onClick={() => setIsNoteModalOpen(false)} className={`flex-1 py-3 ${theme.surfaceAlt} ${theme.text} rounded-xl font-bold hover:opacity-80`}>取消</button>
-          </div>
+          {!noteSyncMode ? (
+            <>
+              <p className={`text-sm ${theme.textLight} ${theme.surfaceAlt} p-3 rounded-xl border ${theme.border}`}>此內容僅供教師查看，可紀錄家庭狀況、輔導需求等隱私資訊。</p>
+              <p className={`text-sm font-semibold ${theme.text}`}>
+                {currentDate}（星期{['日','一','二','三','四','五','六'][new Date(currentDate).getDay()]}）
+              </p>
+              <textarea className={`w-full h-48 p-4 ${theme.inputBg} border ${theme.border} rounded-xl focus:ring-2 ${theme.focusRing} outline-none resize-none text-base ${theme.text}`} placeholder="請輸入私密觀察紀錄..." value={tempNote} onChange={(e) => setTempNote(e.target.value)} />
+              <div className="flex gap-2 pt-2">
+                <button onClick={handleSaveNote} className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90`}>儲存</button>
+                <button onClick={handleCloseNoteModal} className={`flex-1 py-3 ${theme.surfaceAlt} ${theme.text} rounded-xl font-bold hover:opacity-80`}>取消</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={`text-sm ${theme.accentPositive} bg-green-50 dark:bg-green-900/20 p-3 rounded-xl font-bold`}>
+                ✅ 已儲存 {student.name} 的紀錄
+              </div>
+              <h4 className={`font-bold ${theme.text}`}>要將此紀錄同步到其他學生嗎？</h4>
+              <p className={`text-xs ${theme.textLight}`}>已有紀錄的學生會自動追加，不會覆蓋原有內容</p>
+              <div className="flex items-center gap-2 pb-1">
+                <button
+                  onClick={() => {
+                    const otherIds = students.filter(s => s.id !== student.id).map(s => s.id);
+                    setSyncTargetIds(prev => prev.size === otherIds.length ? new Set() : new Set(otherIds));
+                  }}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg ${theme.surfaceAlt} ${theme.text} hover:opacity-80 transition`}
+                >
+                  {syncTargetIds.size === students.filter(s => s.id !== student.id).length ? '取消全選' : '全選'}
+                </button>
+              </div>
+              <div className={`max-h-60 overflow-y-auto space-y-1 border ${theme.border} rounded-xl p-2`}>
+                {[...students]
+                  .filter(s => s.id !== student.id)
+                  .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+                  .map(s => {
+                    const targetNote = s.dailyRecords[currentDate]?.note?.trim() || '';
+                    return (
+                      <label key={s.id} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:${theme.surfaceAlt} transition`}>
+                        <input
+                          type="checkbox"
+                          checked={syncTargetIds.has(s.id)}
+                          onChange={() => {
+                            setSyncTargetIds(prev => {
+                              const next = new Set(prev);
+                              if (next.has(s.id)) next.delete(s.id);
+                              else next.add(s.id);
+                              return next;
+                            });
+                          }}
+                          className="w-4 h-4 rounded accent-current"
+                        />
+                        <span className={`font-bold text-sm ${theme.text}`}>{(s.order ?? 0) + 1}. {s.name}</span>
+                        {targetNote && (
+                          <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full font-bold">已有紀錄，將追加</span>
+                        )}
+                      </label>
+                    );
+                  })}
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleSyncNote}
+                  disabled={syncTargetIds.size === 0 || isSyncing}
+                  className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90 disabled:opacity-50 transition`}
+                >
+                  {isSyncing ? '同步中...' : `同步紀錄（${syncTargetIds.size} 位）`}
+                </button>
+                <button onClick={handleCloseNoteModal} className={`flex-1 py-3 ${theme.surfaceAlt} ${theme.text} rounded-xl font-bold hover:opacity-80`}>跳過，直接關閉</button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 

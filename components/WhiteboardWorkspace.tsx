@@ -23,6 +23,13 @@ const boardFontSizeMap = [
   { template: 'text-2xl lg:text-4xl',  board: 'text-3xl lg:text-5xl', lineHeight: '5.5rem',  mobileLineHeight: '3.75rem' },  // XL
 ];
 
+const scheduleFontSizeMap = [
+  { period: 'text-xs',   time: 'text-[10px]', subject: 'text-sm',  gap: 'space-y-1',   padding: 'p-2',   periodW: 'w-10' },  // S
+  { period: 'text-sm',   time: 'text-xs',     subject: 'text-base', gap: 'space-y-1.5', padding: 'p-2.5', periodW: 'w-12' },  // M（預設）
+  { period: 'text-sm',   time: 'text-xs',     subject: 'text-lg',  gap: 'space-y-2',   padding: 'p-3',   periodW: 'w-12' },  // L
+  { period: 'text-base', time: 'text-sm',     subject: 'text-xl',  gap: 'space-y-2.5', padding: 'p-3.5', periodW: 'w-14' },  // XL
+];
+
 const useIsLgScreen = () => {
   const [isLg, setIsLg] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true
@@ -56,6 +63,7 @@ export const WhiteboardWorkspace = ({
   const [currentTime, setCurrentTime] = useState(getCurrentTime());
   const [showScheduleEditor, setShowScheduleEditor] = useState(false);
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
+  const [showTomorrow, setShowTomorrow] = useState(false);
   const writingMode: BoardWritingMode = config.boardWritingMode ?? 'horizontal-tb';
   const showBoardLines = config.showBoardLines ?? true;
   const boardFontLevel = config.boardFontSizeLevel ?? 1;
@@ -86,6 +94,16 @@ export const WhiteboardWorkspace = ({
   const setBoardFontSize = async (level: number) => {
     const clamped = Math.max(0, Math.min(boardFontSizeMap.length - 1, level));
     const newConfig = { ...config, boardFontSizeLevel: clamped };
+    if (onConfigUpdate) onConfigUpdate(newConfig);
+    await updateClassConfig(userUid, newConfig);
+  };
+
+  const scheduleFontLevel = config.scheduleFontSizeLevel ?? 1;
+  const sf = scheduleFontSizeMap[scheduleFontLevel];
+
+  const setScheduleFontSize = async (level: number) => {
+    const clamped = Math.max(0, Math.min(scheduleFontSizeMap.length - 1, level));
+    const newConfig = { ...config, scheduleFontSizeLevel: clamped };
     if (onConfigUpdate) onConfigUpdate(newConfig);
     await updateClassConfig(userUid, newConfig);
   };
@@ -125,9 +143,10 @@ export const WhiteboardWorkspace = ({
   };
 
   const displaySchedule = useMemo(() => {
-    const day = currentTime.dayOfWeek;
-    return config.weeklySchedule?.find(s => s.dayOfWeek === day);
-  }, [config.weeklySchedule, currentTime.dayOfWeek]);
+    const tomorrowDayOfWeek = currentTime.dayOfWeek === 6 ? 0 : currentTime.dayOfWeek + 1;
+    const targetDay = showTomorrow ? tomorrowDayOfWeek : currentTime.dayOfWeek;
+    return config.weeklySchedule?.find(s => s.dayOfWeek === targetDay);
+  }, [config.weeklySchedule, currentTime.dayOfWeek, showTomorrow]);
 
   // Decide which template content to show in the top section
   const templateContent = useMemo(() => {
@@ -142,11 +161,11 @@ export const WhiteboardWorkspace = ({
   const showSituationPills = hasSituationTemplates || hasDailyTemplates;
 
   return (
-    <div className="flex flex-col h-full p-6 lg:p-8 overflow-hidden">
+    <div className="flex flex-col h-full p-3 lg:p-8 overflow-hidden">
       {/* Header */}
-      <div className="group flex justify-between items-center mb-6 shrink-0">
+      <div className="group flex flex-col lg:flex-row lg:justify-between lg:items-center mb-3 lg:mb-6 gap-1 lg:gap-0 shrink-0">
         <div className="flex items-center gap-2 relative">
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 mr-1">
+          <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex gap-0.5 mr-1">
             <button
               onClick={() => setClockSizeLevel?.(Math.max(0, clockSizeLevel - 1))}
               disabled={clockSizeLevel === 0}
@@ -171,14 +190,14 @@ export const WhiteboardWorkspace = ({
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-3 lg:gap-6 flex-1 min-h-0">
         {/* Left: Whiteboard (2/3) */}
         <div className={`flex-[2] ${theme.surface} rounded-3xl border ${theme.border} shadow-sm overflow-hidden flex flex-col`} style={{ '--board-line-height': effectiveLineHeight } as React.CSSProperties}>
 
           {/* Board toolbar */}
           <div className={`p-4 border-b ${theme.border} flex flex-wrap justify-between items-center gap-2 ${theme.surfaceAlt}`}>
             <h3 className={`text-lg font-bold ${theme.text} flex items-center gap-2 shrink-0 group/font`}>
-              <div className="opacity-0 group-hover/font:opacity-100 transition-opacity flex gap-0.5 mr-1">
+              <div className="opacity-100 lg:opacity-0 lg:group-hover/font:opacity-100 transition-opacity flex gap-0.5 mr-1">
                 <button
                   onClick={() => setBoardFontSize(boardFontLevel - 1)}
                   disabled={boardFontLevel === 0}
@@ -327,39 +346,75 @@ export const WhiteboardWorkspace = ({
 
         {/* Right: Schedule (1/3) */}
         <div className={`flex-1 ${theme.surface} rounded-3xl border ${theme.border} shadow-sm overflow-hidden flex flex-col`}>
-          <div className={`p-6 border-b ${theme.border} ${theme.surfaceAlt} flex justify-between items-center`}>
-            <h3 className={`text-lg font-bold ${theme.text} flex items-center gap-2`}>
-              <Clock className="w-5 h-5" /> 今日課表
-            </h3>
+          <div className={`px-4 py-3 border-b ${theme.border} ${theme.surfaceAlt} flex justify-between items-center`}>
+            <div className="flex items-center gap-2">
+              {/* 字體縮放按鈕（hover 顯示） */}
+              <div className="group/schfont flex items-center gap-2">
+                <div className="opacity-100 lg:opacity-0 lg:group-hover/schfont:opacity-100 transition-opacity flex gap-0.5">
+                  <button
+                    onClick={() => setScheduleFontSize(scheduleFontLevel - 1)}
+                    disabled={scheduleFontLevel === 0}
+                    className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setScheduleFontSize(scheduleFontLevel + 1)}
+                    disabled={scheduleFontLevel === scheduleFontSizeMap.length - 1}
+                    className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <Clock className={`w-5 h-5 ${theme.textLight}`} />
+              </div>
+              {/* 今日/明日 pill-tab */}
+              <div className={`flex ${theme.bg} p-0.5 rounded-lg`}>
+                <button
+                  onClick={() => setShowTomorrow(false)}
+                  className={`px-2.5 py-1 text-sm font-bold rounded-md transition
+                    ${!showTomorrow ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight}`}`}
+                >
+                  今日
+                </button>
+                <button
+                  onClick={() => setShowTomorrow(true)}
+                  className={`px-2.5 py-1 text-sm font-bold rounded-md transition
+                    ${showTomorrow ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight}`}`}
+                >
+                  明日
+                </button>
+              </div>
+            </div>
             <button
               onClick={() => setShowScheduleEditor(true)}
-              className={`p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition ${theme.textLight} hover:${theme.text}`}
+              className={`p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition ${theme.textLight}`}
               title="設定課表"
             >
               <Settings className="w-5 h-5" />
             </button>
           </div>
-          <div className="flex-1 p-6 overflow-y-auto">
+          <div className="flex-1 p-3 overflow-y-auto">
             {displaySchedule && displaySchedule.periods.length > 0 ? (
-              <div className="space-y-3">
+              <div className={sf.gap}>
                 {displaySchedule.periods.map((p, idx) => {
                   const { name, time } = getPeriodParts(p.periodName);
-                  const isActive = isCurrentPeriod(p.periodName);
+                  const isActive = !showTomorrow && isCurrentPeriod(p.periodName);
 
                   return (
                     <div
                       key={idx}
                       className={`
-                        grid grid-cols-[auto_1fr_1fr] gap-4 items-center p-3 rounded-xl border transition-all duration-300
+                        grid grid-cols-[auto_1fr_1fr] gap-3 items-center ${sf.padding} rounded-xl border transition-all duration-300
                         ${isActive
                           ? `${theme.primary} border-transparent shadow-lg scale-105 z-10`
                           : `${theme.bg} border ${theme.border}`
                         }
                       `}
                     >
-                      <span className={`w-12 text-center text-sm font-bold ${isActive ? 'text-white' : theme.text}`}>{name}</span>
-                      <span className={`text-center text-xs font-mono whitespace-nowrap ${isActive ? 'text-white/80' : theme.textLight} bg-black/5 dark:bg-white/10 py-1 px-2 rounded-lg`}>{time}</span>
-                      <span className={`text-center font-bold text-lg ${isActive ? 'text-white' : theme.text}`}>{p.subject || "---"}</span>
+                      <span className={`${sf.periodW} text-center ${sf.period} font-bold ${isActive ? 'text-white' : theme.text}`}>{name}</span>
+                      <span className={`text-center ${sf.time} font-mono whitespace-nowrap ${isActive ? 'text-white/80' : theme.textLight} bg-black/5 dark:bg-white/10 py-0.5 px-1.5 rounded-md`}>{time}</span>
+                      <span className={`text-center font-bold ${sf.subject} ${isActive ? 'text-white' : theme.text}`}>{p.subject || "---"}</span>
                     </div>
                   );
                 })}
@@ -367,8 +422,8 @@ export const WhiteboardWorkspace = ({
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
                 <CalendarIcon className={`w-12 h-12 mb-4 ${theme.textLight}`} />
-                <p className={`${theme.text}`}>今日無課程或尚未設定</p>
-                <button onClick={() => setShowScheduleEditor(true)} className={`mt-4 text-sm underline ${theme.primary} hover:opacity-80`}>
+                <p className={`${theme.text}`}>{showTomorrow ? '明日無課程或尚未設定' : '今日無課程或尚未設定'}</p>
+                <button onClick={() => setShowScheduleEditor(true)} className={`mt-4 text-sm underline ${theme.primaryText} hover:opacity-80`}>
                   前往設定
                 </button>
               </div>

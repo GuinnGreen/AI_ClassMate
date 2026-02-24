@@ -128,9 +128,9 @@ export const Sidebar = ({
               <span className={`text-[10px] font-bold ${theme.textLight}`}>姓名</span>
             </div>
             <div className={`flex items-center gap-1 text-[10px] font-bold ${theme.textLight}`}>
-              <span className="w-10 text-center">當日</span>
-              <span className="w-10 text-center">總分</span>
-              <span className="w-10 text-center">假別</span>
+              <span className="w-10 text-right">當日</span>
+              <span className="w-10 text-right">總分</span>
+              <span className="w-10 text-right">假別</span>
             </div>
           </div>
 
