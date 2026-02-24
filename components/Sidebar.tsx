@@ -122,15 +122,15 @@ export const Sidebar = ({
             </div>
           </div>
 
-          <div className="px-3 pb-1 flex items-center justify-between shrink-0">
+          <div className="px-6 pb-1 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-8" />
               <span className={`text-[10px] font-bold ${theme.textLight}`}>姓名</span>
             </div>
             <div className={`flex items-center gap-1 text-[10px] font-bold ${theme.textLight}`}>
-              <span className="w-10 text-right">當日</span>
-              <span className="w-10 text-right">總分</span>
-              <span className="w-10 text-right">假別</span>
+              <span className="w-9 text-right">當日</span>
+              <span className="w-9 text-right">總分</span>
+              <span className="w-9 text-right">假別</span>
             </div>
           </div>
 
@@ -154,7 +154,7 @@ export const Sidebar = ({
                       : `hover:${theme.surface} hover:shadow-sm ${theme.textLight} hover:${theme.text}`}
                   `}
                 >
-                  <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="flex items-center gap-3 overflow-hidden min-w-0">
                     <div className={`
                       w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors shrink-0
                       ${selectedStudentId === student.id ? `${theme.primary} text-white` : `${theme.surfaceAccent} ${theme.textLight}`}
@@ -164,21 +164,21 @@ export const Sidebar = ({
                     <span className="font-bold truncate">{student.name}</span>
                   </div>
                   <div className="flex flex-row items-center gap-1 shrink-0">
-                    <div className="w-10 flex justify-end">
+                    <div className="w-9 flex justify-end">
                       {todayScore !== 0 && (
                         <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${todayScore > 0 ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
                           {todayScore > 0 ? '+' : ''}{todayScore}
                         </span>
                       )}
                     </div>
-                    <div className="w-10 flex justify-end">
+                    <div className="w-9 flex justify-end">
                       {student.totalScore !== 0 && (
                         <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${student.totalScore > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                           {student.totalScore > 0 ? '+' : ''}{student.totalScore}
                         </span>
                       )}
                     </div>
-                    <div className="w-10 flex justify-end">
+                    <div className="w-9 flex justify-end">
                       {student.dailyRecords[today]?.absence && (
                         <span className="text-[10px] font-bold px-1 py-0.5 rounded-md bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                           {student.dailyRecords[today].absence.replace('假', '')}
