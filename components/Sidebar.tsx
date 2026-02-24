@@ -84,7 +84,7 @@ export const Sidebar = ({
 
       {/* Sidebar Container */}
       <div className={`
-        fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-300 ease-in-out
         lg:static lg:translate-x-0
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
         ${theme.surfaceAlt} border-r ${theme.border}
