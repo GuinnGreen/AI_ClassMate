@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
 import { LIGHT_THEME } from '../constants/theme';
-import { School } from 'lucide-react';
+import { School, LogIn, UserPlus } from 'lucide-react';
 
 export const Login = () => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -39,14 +39,38 @@ export const Login = () => {
       <div className={`w-full max-w-md p-8 space-y-6 ${theme.surface} rounded-3xl shadow-xl border ${theme.border}`}>
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <div className={`p-4 ${theme.primary} rounded-full shadow-md`}>
-              <School className="w-10 h-10 text-white" />
+            <div className={`p-4 ${isRegistering ? 'bg-[#5B8C7B]' : 'bg-[#6B7C93]'} rounded-full shadow-md transition-colors duration-300`}>
+              {isRegistering
+                ? <UserPlus className="w-10 h-10 text-white" />
+                : <LogIn className="w-10 h-10 text-white" />}
             </div>
           </div>
           <h1 className={`text-2xl font-bold ${theme.text}`}>ClassMate AI</h1>
           <p className={`${theme.textLight} mt-2`}>
             {isRegistering ? '建立您的智慧班級' : '歡迎回來，老師'}
           </p>
+        </div>
+        <div className={`flex rounded-2xl bg-[#FAFAFA] p-1 border ${theme.border}`}>
+          <button
+            type="button"
+            onClick={() => { setIsRegistering(false); setError(''); }}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
+              !isRegistering ? 'bg-[#6B7C93] text-white shadow-sm' : `${theme.textLight}`
+            }`}
+          >
+            <LogIn className="w-4 h-4" />
+            登入
+          </button>
+          <button
+            type="button"
+            onClick={() => { setIsRegistering(true); setError(''); }}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
+              isRegistering ? 'bg-[#5B8C7B] text-white shadow-sm' : `${theme.textLight}`
+            }`}
+          >
+            <UserPlus className="w-4 h-4" />
+            註冊
+          </button>
         </div>
         <form onSubmit={handleAuth} className="space-y-4">
           <div>
@@ -75,19 +99,13 @@ export const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-3 px-4 ${theme.primary} ${theme.primaryHover} text-white font-bold rounded-2xl shadow-md transition disabled:opacity-50 transform hover:-translate-y-0.5`}
+            className={`w-full py-3 px-4 ${
+              isRegistering ? 'bg-[#5B8C7B] hover:bg-[#4A7B6B]' : 'bg-[#6B7C93] hover:bg-[#556375]'
+            } text-white font-bold rounded-2xl shadow-md transition disabled:opacity-50 transform hover:-translate-y-0.5`}
           >
             {loading ? '處理中...' : (isRegistering ? '註冊帳號' : '進入系統')}
           </button>
         </form>
-        <div className="text-center">
-          <button
-            onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
-            className={`text-sm ${theme.textLight} hover:${theme.text} underline underline-offset-2 transition`}
-          >
-            {isRegistering ? '已有帳號？返回登入' : '還沒有帳號？立即免費註冊'}
-          </button>
-        </div>
       </div>
     </div>
   );
