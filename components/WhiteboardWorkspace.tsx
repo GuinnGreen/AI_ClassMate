@@ -16,6 +16,13 @@ const clockSizeMap = [
   { time: 'text-9xl', date: 'text-4xl', clockIcon: 'w-10 h-10', calIcon: 'w-8 h-8' },
 ];
 
+const boardFontSizeMap = [
+  { template: 'text-xl',  board: 'text-2xl', lineHeight: '2.75rem' },  // S
+  { template: 'text-2xl', board: 'text-3xl', lineHeight: '3.5rem' },   // M（預設）
+  { template: 'text-3xl', board: 'text-4xl', lineHeight: '4.25rem' },  // L
+  { template: 'text-4xl', board: 'text-5xl', lineHeight: '5.5rem' },   // XL
+];
+
 export const WhiteboardWorkspace = ({
   userUid,
   config,
@@ -38,6 +45,8 @@ export const WhiteboardWorkspace = ({
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const writingMode: BoardWritingMode = config.boardWritingMode ?? 'horizontal-tb';
   const showBoardLines = config.showBoardLines ?? true;
+  const boardFontLevel = config.boardFontSizeLevel ?? 1;
+  const bf = boardFontSizeMap[boardFontLevel];
 
   const activeSituation = config.activeBoardSituation ?? null;
 
@@ -59,6 +68,13 @@ export const WhiteboardWorkspace = ({
     await updateClassConfig(userUid, newConfig);
   };
 
+  const setBoardFontSize = async (level: number) => {
+    const clamped = Math.max(0, Math.min(boardFontSizeMap.length - 1, level));
+    const newConfig = { ...config, boardFontSizeLevel: clamped };
+    if (onConfigUpdate) onConfigUpdate(newConfig);
+    await updateClassConfig(userUid, newConfig);
+  };
+
   const writingModeOptions: { mode: BoardWritingMode; label: string }[] = [
     { mode: 'horizontal-tb', label: '橫' },
     { mode: 'vertical-lr', label: '直↓→' },
@@ -74,6 +90,8 @@ export const WhiteboardWorkspace = ({
   const verticalStyle = writingMode !== 'horizontal-tb'
     ? { writingMode, textOrientation: 'upright' as const }
     : { writingMode };
+
+  const noLinesStyle = !showBoardLines ? { lineHeight: bf.lineHeight } : {};
 
   useEffect(() => {
     setBoardContent(config.class_board || '');
@@ -140,11 +158,27 @@ export const WhiteboardWorkspace = ({
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
         {/* Left: Whiteboard (2/3) */}
-        <div className={`flex-[2] ${theme.surface} rounded-3xl border ${theme.border} shadow-sm overflow-hidden flex flex-col`}>
+        <div className={`flex-[2] ${theme.surface} rounded-3xl border ${theme.border} shadow-sm overflow-hidden flex flex-col`} style={{ '--board-line-height': bf.lineHeight } as React.CSSProperties}>
 
           {/* Board toolbar */}
           <div className={`p-4 border-b ${theme.border} flex flex-wrap justify-between items-center gap-2 ${theme.surfaceAlt}`}>
-            <h3 className={`text-lg font-bold ${theme.text} flex items-center gap-2 shrink-0`}>
+            <h3 className={`text-lg font-bold ${theme.text} flex items-center gap-2 shrink-0 group/font`}>
+              <div className="opacity-0 group-hover/font:opacity-100 transition-opacity flex gap-0.5 mr-1">
+                <button
+                  onClick={() => setBoardFontSize(boardFontLevel - 1)}
+                  disabled={boardFontLevel === 0}
+                  className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setBoardFontSize(boardFontLevel + 1)}
+                  disabled={boardFontLevel === boardFontSizeMap.length - 1}
+                  className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <ClipboardList className="w-5 h-5" /> 班級公告欄
             </h3>
 
@@ -239,8 +273,8 @@ export const WhiteboardWorkspace = ({
                   style={writingMode !== 'horizontal-tb' ? { minHeight: '100%' } : {}}
                 >
                   <div
-                    style={verticalStyle}
-                    className={`whitespace-pre-wrap leading-relaxed text-xl ${theme.text} font-handwritten opacity-80 ${paperClass} w-full h-full`}
+                    style={{ ...verticalStyle, ...noLinesStyle }}
+                    className={`whitespace-pre-wrap ${bf.template} ${theme.text} font-handwritten opacity-80 ${paperClass} w-full h-full`}
                   >
                     {templateContent}
                   </div>
@@ -258,15 +292,15 @@ export const WhiteboardWorkspace = ({
                   <textarea
                     value={boardContent}
                     onChange={(e) => setBoardContent(e.target.value)}
-                    style={verticalStyle}
-                    className={`w-full h-full p-4 ${theme.inputBg} rounded-xl border ${theme.border} focus:ring-2 ${theme.focusRing} outline-none resize-none text-2xl leading-relaxed ${theme.text} font-handwritten ${paperClass}`}
+                    style={{ ...verticalStyle, ...noLinesStyle }}
+                    className={`w-full h-full p-4 ${theme.inputBg} rounded-xl border ${theme.border} focus:ring-2 ${theme.focusRing} outline-none resize-none ${bf.board} ${theme.text} font-handwritten ${paperClass}`}
                     placeholder="請輸入今日事項、聯絡簿內容..."
                   />
                 ) : (
                   <div
-                    style={verticalStyle}
+                    style={{ ...verticalStyle, ...noLinesStyle }}
                     onClick={() => setIsEditing(true)}
-                    className={`w-full h-full whitespace-pre-wrap leading-relaxed text-2xl ${theme.text} font-handwritten ${paperClass} cursor-text ${!boardContent && `${theme.textLight} italic`}`}
+                    className={`w-full h-full whitespace-pre-wrap ${bf.board} ${theme.text} font-handwritten ${paperClass} cursor-text ${!boardContent && `${theme.textLight} italic`}`}
                   >
                     {boardContent || "點此輸入今日事項..."}
                   </div>
