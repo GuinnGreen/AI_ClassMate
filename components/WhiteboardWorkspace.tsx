@@ -163,7 +163,7 @@ export const WhiteboardWorkspace = ({
   return (
     <div className="flex flex-col h-full p-3 lg:p-8 overflow-hidden">
       {/* Header */}
-      <div className="group flex flex-col lg:flex-row lg:justify-between lg:items-center mb-3 lg:mb-6 gap-1 lg:gap-0 shrink-0">
+      <div className="group flex flex-col lg:flex-row lg:justify-between lg:items-center mb-3 lg:mb-6 gap-1 lg:gap-0 shrink-0 pl-11 lg:pl-0">
         <div className="flex items-center gap-2 relative">
           <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex gap-0.5 mr-1">
             <button

@@ -203,7 +203,7 @@ export default function App() {
             userUid={user!.uid}
             user={user!}
           />
-          <div className="flex-1 flex flex-col h-full overflow-hidden p-3 pl-14 lg:p-4 relative">
+          <div className="flex-1 flex flex-col h-full overflow-hidden p-3 lg:p-4 relative">
             <div className={`flex-1 overflow-hidden rounded-3xl shadow-sm border ${theme.border} ${theme.surface} relative`}>
               {students.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 animate-fade-in">

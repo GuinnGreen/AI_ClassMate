@@ -405,7 +405,7 @@ export const StudentDetailWorkspace = ({
   return (
     <>
       <div className={`flex flex-col h-full ${theme.surface} rounded-3xl overflow-hidden`}>
-        <div className={`flex flex-nowrap items-center justify-between gap-3 p-3 lg:p-6 border-b ${theme.border} z-20 shrink-0 overflow-x-auto`}>
+        <div className={`flex flex-nowrap items-center justify-between gap-3 p-3 pl-14 lg:p-6 border-b ${theme.border} z-20 shrink-0 overflow-x-auto`}>
           <div className="flex items-center gap-4">
             <button onClick={onBack} className={`p-2 hover:${theme.surfaceAlt} rounded-full lg:hidden ${theme.text}`}><ChevronLeft className="w-5 h-5" /></button>
             <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full ${theme.primary} text-white flex items-center justify-center font-bold text-base shadow-sm`}>{student.seatNumber ?? student.order ?? '?'}</div>
