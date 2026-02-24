@@ -37,6 +37,16 @@
 .animate-slide-in-left  { animation: slide-in-left  250ms ease-out; }
 .animate-slide-in-right { animation: slide-in-right 250ms ease-out; }
 
+/* Calendar expand/collapse */
+.calendar-view-transition {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: max-height 300ms ease-in-out;
+  overflow: hidden;
+}
+.calendar-view-week { max-height: 90px; }
+.calendar-view-month { max-height: 340px; }
+
 /* Animation for click feedback (Deletion) */
 .active-shrink:active {
   transform: scale(0.92);

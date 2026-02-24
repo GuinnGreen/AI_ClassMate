@@ -390,6 +390,14 @@ export const StudentDetailWorkspace = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setPendingAction('notes'); setShowPasswordModal(true); }}
+              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} transition text-sm font-bold`}
+              title="輔導紀錄"
+            >
+              {hasNote ? <Check className={`w-4 h-4 ${theme.primaryText}`} /> : <Lock className="w-4 h-4" />}
+              輔導紀錄
+            </button>
             <div className={`flex ${theme.surfaceAlt} p-1.5 rounded-xl`}>
               <button onClick={() => setMode('daily')} className={`px-5 py-2 text-sm font-bold rounded-lg transition ${mode === 'daily' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}>日常紀錄</button>
               <button onClick={() => setMode('ai')} className={`px-5 py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><Sparkles className="w-4 h-4" /> AI 評語</button>
@@ -474,22 +482,6 @@ export const StudentDetailWorkspace = ({
                   </h3>
                   <button onClick={() => setIsBehaviorSettingsOpen(true)} className={`p-2 rounded-lg hover:${theme.surfaceAlt} ${theme.textLight} transition`} title="自訂按鈕">
                     <Settings className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className={`${theme.surface} p-2 rounded-2xl border ${theme.border} shadow-sm`}>
-                  <button
-                    onClick={() => { setPendingAction('notes'); setShowPasswordModal(true); }}
-                    className={`w-full p-4 rounded-xl ${theme.surfaceAccent} border-2 ${theme.border} text-center hover:border-[#8da399] transition-all transform active:scale-95 group`}
-                  >
-                    <div className="flex items-center justify-center gap-2 mb-1">
-                      {hasNote ? <div className={`p-1 rounded-full ${theme.primary} text-white`}><Check className="w-3 h-3 stroke-[3]" /></div> : <Lock className={`w-5 h-5 ${theme.textLight} group-hover:${theme.text}`} />}
-                      <span className={`font-bold text-lg ${theme.text}`}>輔導紀錄</span>
-                    </div>
-                    {hasNote ?
-                      <p className={`text-xs ${theme.primary} font-bold`}>今日已建立紀錄 (加密)</p> :
-                      <p className={`text-xs ${theme.textLight}`}>紀錄家庭狀況與隱私備註 (加密)</p>
-                    }
                   </button>
                 </div>
 
