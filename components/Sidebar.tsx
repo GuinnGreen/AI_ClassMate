@@ -74,17 +74,20 @@ export const Sidebar = ({
 
   return (
     <>
-      {/* Mobile Toggle Button */}
-      <button
-        className={`lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg ${theme.surface} shadow-md border ${theme.border}`}
-        onClick={() => setIsMobileOpen(!isMobileOpen)}
-      >
-        <Users className={`w-6 h-6 ${theme.text}`} />
-      </button>
+      {/* Mobile Toggle Button — 開啟 sidebar 時隱藏 */}
+      {!isMobileOpen && (
+        <button
+          className={`lg:hidden fixed left-4 z-50 p-2 rounded-lg ${theme.surface} shadow-md border ${theme.border} top-[calc(env(safe-area-inset-top,0px)+1rem)]`}
+          onClick={() => setIsMobileOpen(true)}
+        >
+          <Users className={`w-6 h-6 ${theme.text}`} />
+        </button>
+      )}
 
       {/* Sidebar Container */}
       <div className={`
         fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-300 ease-in-out
+        pt-[env(safe-area-inset-top,0px)] lg:pt-0
         lg:static lg:translate-x-0
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
         ${theme.surfaceAlt} border-r ${theme.border}
