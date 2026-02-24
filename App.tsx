@@ -198,6 +198,10 @@ export default function App() {
             napTimeStart={classConfig.napTimeStart}
             napTimeEnd={classConfig.napTimeEnd}
             onNapTimeChange={handleNapTimeChange}
+            classConfig={classConfig}
+            onConfigUpdate={setClassConfig}
+            userUid={user!.uid}
+            user={user!}
           />
           <div className="flex-1 flex flex-col h-full overflow-hidden p-3 lg:p-4 relative">
             <div className={`flex-1 overflow-hidden rounded-3xl shadow-sm border ${theme.border} ${theme.surface} relative`}>

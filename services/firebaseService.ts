@@ -9,6 +9,7 @@ import {
   arrayRemove,
   writeBatch,
   addDoc,
+  getDocs,
 } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential, User } from 'firebase/auth';
 import { db } from '../firebase';
@@ -251,4 +252,19 @@ export const verifyPassword = async (user: User, password: string) => {
   if (!user.email) throw new Error('No email');
   const credential = EmailAuthProvider.credential(user.email, password);
   await reauthenticateWithCredential(user, credential);
+};
+
+// --- Semester Archive ---
+
+export const archiveSemester = async (user: User, password: string) => {
+  if (!user.email) throw new Error('No email');
+  const credential = EmailAuthProvider.credential(user.email, password);
+  await reauthenticateWithCredential(user, credential);
+
+  const studentsSnap = await getDocs(collection(db, `users/${user.uid}/students`));
+  const batch = writeBatch(db);
+  studentsSnap.docs.forEach(d => {
+    batch.update(d.ref, { totalScore: 0, dailyRecords: {} });
+  });
+  await batch.commit();
 };

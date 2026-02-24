@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import {
   Users, LogOut, School, Edit3, Moon, Sun,
-  Plus, Minus, Type, Sunset, BarChart2
+  Plus, Minus, Type, Sunset, BarChart2, Calendar
 } from 'lucide-react';
+import { User } from 'firebase/auth';
 import { useTheme } from '../contexts/ThemeContext';
 import { Modal } from './ui/Modal';
-import { Student } from '../types';
+import { Student, ClassConfig } from '../types';
 import { formatDate } from '../utils/date';
+import { updateClassConfig, archiveSemester } from '../services/firebaseService';
 import { AbsenceStatsModal } from './AbsenceStatsModal';
 
 export const Sidebar = ({
@@ -22,6 +24,10 @@ export const Sidebar = ({
   napTimeStart,
   napTimeEnd,
   onNapTimeChange,
+  classConfig,
+  onConfigUpdate,
+  userUid,
+  user,
 }: {
   students: Student[];
   selectedStudentId: string | null;
@@ -35,6 +41,10 @@ export const Sidebar = ({
   napTimeStart?: string;
   napTimeEnd?: string;
   onNapTimeChange: (start: string, end: string) => void;
+  classConfig: ClassConfig;
+  onConfigUpdate: (config: ClassConfig) => void;
+  userUid: string;
+  user: User;
 }) => {
   const theme = useTheme();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -42,11 +52,23 @@ export const Sidebar = ({
   const [showAbsenceStats, setShowAbsenceStats] = useState(false);
   const [napStart, setNapStart] = useState(napTimeStart || '');
   const [napEnd, setNapEnd] = useState(napTimeEnd || '');
+  const [showSemesterSettings, setShowSemesterSettings] = useState(false);
+  const [semStart, setSemStart] = useState(classConfig.semesterStart || '');
+  const [semEnd, setSemEnd] = useState(classConfig.semesterEnd || '');
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [archivePassword, setArchivePassword] = useState('');
+  const [archiveError, setArchiveError] = useState('');
+  const [archiving, setArchiving] = useState(false);
 
   useEffect(() => {
     setNapStart(napTimeStart || '');
     setNapEnd(napTimeEnd || '');
   }, [napTimeStart, napTimeEnd]);
+
+  useEffect(() => {
+    setSemStart(classConfig.semesterStart || '');
+    setSemEnd(classConfig.semesterEnd || '');
+  }, [classConfig.semesterStart, classConfig.semesterEnd]);
 
   const today = formatDate(new Date());
 
@@ -100,6 +122,18 @@ export const Sidebar = ({
             </div>
           </div>
 
+          <div className="px-3 pb-1 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-8" />
+              <span className={`text-[10px] font-bold ${theme.textLight}`}>姓名</span>
+            </div>
+            <div className={`flex items-center gap-1 text-[10px] font-bold ${theme.textLight}`}>
+              <span className="w-10 text-center">當日</span>
+              <span className="w-10 text-center">總分</span>
+              <span className="w-10 text-center">假別</span>
+            </div>
+          </div>
+
           <div className={`flex-1 overflow-y-auto px-3 pb-4 space-y-1 custom-scrollbar ${fontSizeLevel === 0 ? 'text-sm' :
             fontSizeLevel === 1 ? 'text-base' :
               fontSizeLevel === 2 ? 'text-lg' : 'text-xl'
@@ -144,6 +178,13 @@ export const Sidebar = ({
                         </span>
                       )}
                     </div>
+                    <div className="w-10 flex justify-end">
+                      {student.dailyRecords[today]?.absence && (
+                        <span className="text-[10px] font-bold px-1 py-0.5 rounded-md bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                          {student.dailyRecords[today].absence.replace('假', '')}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               );
@@ -168,6 +209,13 @@ export const Sidebar = ({
                 title="午休自動深色設定"
               >
                 <Sunset className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setShowSemesterSettings(true)}
+                className={`p-2 rounded-lg hover:${theme.surface} transition ${classConfig.semesterStart && classConfig.semesterEnd ? theme.text : theme.textLight} hover:${theme.text}`}
+                title="學期設定"
+              >
+                <Calendar className="w-5 h-5" />
               </button>
             </div>
             <div className={`flex items-center gap-1 ${theme.surface} rounded-lg border ${theme.border} p-1`}>
@@ -208,7 +256,106 @@ export const Sidebar = ({
         isOpen={showAbsenceStats}
         onClose={() => setShowAbsenceStats(false)}
         students={students}
+        semesterStart={classConfig.semesterStart}
+        semesterEnd={classConfig.semesterEnd}
       />
+
+      {/* Semester Settings Modal */}
+      <Modal
+        isOpen={showSemesterSettings}
+        onClose={() => { setShowSemesterSettings(false); setShowArchiveConfirm(false); setArchivePassword(''); setArchiveError(''); }}
+        title="學期設定"
+        maxWidth="max-w-sm"
+      >
+        <div className="space-y-4">
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className={`block text-sm font-bold mb-1 ${theme.text}`}>學期開始</label>
+              <input
+                type="date"
+                value={semStart}
+                onChange={(e) => setSemStart(e.target.value)}
+                className={`w-full p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} outline-none focus:ring-2 ${theme.focusRing}`}
+              />
+            </div>
+            <div className="flex-1">
+              <label className={`block text-sm font-bold mb-1 ${theme.text}`}>學期結束</label>
+              <input
+                type="date"
+                value={semEnd}
+                onChange={(e) => setSemEnd(e.target.value)}
+                className={`w-full p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} outline-none focus:ring-2 ${theme.focusRing}`}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={async () => {
+                const newConfig = { ...classConfig, semesterStart: semStart, semesterEnd: semEnd };
+                onConfigUpdate(newConfig);
+                await updateClassConfig(userUid, newConfig);
+                setShowSemesterSettings(false);
+              }}
+              disabled={!semStart || !semEnd}
+              className={`px-4 py-2 rounded-lg text-sm font-bold ${theme.primary} text-white transition disabled:opacity-40`}
+            >
+              儲存
+            </button>
+          </div>
+
+          <div className={`border-t ${theme.border} pt-4`}>
+            <p className={`text-xs ${theme.textLight} mb-2`}>封存學期將清空所有學生的累計分數與每日紀錄，此操作無法復原。</p>
+            {!showArchiveConfirm ? (
+              <button
+                onClick={() => setShowArchiveConfirm(true)}
+                className="w-full px-4 py-2 rounded-lg text-sm font-bold bg-red-500 text-white hover:bg-red-600 transition"
+              >
+                封存學期
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <p className={`text-sm font-bold text-red-500`}>請輸入登入密碼以確認封存</p>
+                <input
+                  type="password"
+                  value={archivePassword}
+                  onChange={(e) => { setArchivePassword(e.target.value); setArchiveError(''); }}
+                  className={`w-full p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} outline-none focus:ring-2 ${theme.focusRing}`}
+                  placeholder="請輸入密碼"
+                />
+                {archiveError && <p className="text-red-500 text-sm font-bold">{archiveError}</p>}
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => { setShowArchiveConfirm(false); setArchivePassword(''); setArchiveError(''); }}
+                    className={`px-4 py-2 rounded-lg text-sm ${theme.textLight} hover:opacity-80 transition`}
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setArchiving(true);
+                      try {
+                        await archiveSemester(user, archivePassword);
+                        alert('學期封存完成！所有學生分數與紀錄已重置。');
+                        setShowArchiveConfirm(false);
+                        setArchivePassword('');
+                        setShowSemesterSettings(false);
+                      } catch {
+                        setArchiveError('密碼錯誤，請重新輸入');
+                      } finally {
+                        setArchiving(false);
+                      }
+                    }}
+                    disabled={!archivePassword || archiving}
+                    className="px-4 py-2 rounded-lg text-sm font-bold bg-red-500 text-white hover:bg-red-600 transition disabled:opacity-40"
+                  >
+                    {archiving ? '處理中...' : '確認封存'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={showNapSettings}
