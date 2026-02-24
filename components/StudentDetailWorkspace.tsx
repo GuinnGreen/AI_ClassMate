@@ -405,18 +405,25 @@ export const StudentDetailWorkspace = ({
   return (
     <>
       <div className={`flex flex-col h-full ${theme.surface} rounded-3xl overflow-hidden`}>
-        <div className={`flex flex-nowrap items-center justify-between gap-3 p-3 pl-14 lg:p-6 border-b ${theme.border} z-20 shrink-0 overflow-x-auto`}>
-          <div className="flex items-center gap-4">
-            <button onClick={onBack} className={`p-2 hover:${theme.surfaceAlt} rounded-full lg:hidden ${theme.text}`}><ChevronLeft className="w-5 h-5" /></button>
-            <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full ${theme.primary} text-white flex items-center justify-center font-bold text-base shadow-sm`}>{student.seatNumber ?? student.order ?? '?'}</div>
-            <div>
-              <h2 className={`text-lg lg:text-2xl font-bold ${theme.text}`}>{student.name}</h2>
-              <div className={`text-sm lg:text-base ${theme.textLight} flex items-center gap-2`}>
-                總積分 <span className={`px-2 py-0.5 rounded-lg text-sm font-bold ${student.totalScore >= 0 ? `${theme.accentPositive} text-white` : `${theme.accentNegative} text-white`}`}>{student.totalScore > 0 ? '+' : ''}{student.totalScore}</span>
+        <div className={`flex flex-col lg:flex-row lg:flex-nowrap lg:items-center lg:justify-between gap-2 lg:gap-3 p-3 pl-14 lg:p-6 border-b ${theme.border} z-20 shrink-0`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 lg:gap-4">
+              <button onClick={onBack} className={`p-2 hover:${theme.surfaceAlt} rounded-full lg:hidden ${theme.text}`}><ChevronLeft className="w-5 h-5" /></button>
+              <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full ${theme.primary} text-white flex items-center justify-center font-bold text-base shadow-sm`}>{student.seatNumber ?? student.order ?? '?'}</div>
+              <div>
+                <h2 className={`text-lg lg:text-2xl font-bold ${theme.text}`}>{student.name}</h2>
+                {/* 桌面端：總積分在姓名下方 */}
+                <div className={`hidden lg:flex text-sm lg:text-base ${theme.textLight} items-center gap-2`}>
+                  總積分 <span className={`px-2 py-0.5 rounded-lg text-sm font-bold ${student.totalScore >= 0 ? `${theme.accentPositive} text-white` : `${theme.accentNegative} text-white`}`}>{student.totalScore > 0 ? '+' : ''}{student.totalScore}</span>
+                </div>
               </div>
             </div>
+            {/* 手機端：總積分在右側 */}
+            <div className={`flex lg:hidden items-center gap-1.5 text-sm ${theme.textLight}`}>
+              總積分 <span className={`px-2 py-0.5 rounded-lg text-sm font-bold ${student.totalScore >= 0 ? `${theme.accentPositive} text-white` : `${theme.accentNegative} text-white`}`}>{student.totalScore > 0 ? '+' : ''}{student.totalScore}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1 lg:gap-2 flex-nowrap">
+          <div className="flex items-center gap-1 lg:gap-2 flex-nowrap overflow-x-auto">
             {/* 今日請假 */}
             <div className={`flex items-center gap-1 ${theme.surfaceAlt} p-1.5 rounded-xl`}>
               <BookX className={`w-4 h-4 ${theme.textLight} ml-1`} />
