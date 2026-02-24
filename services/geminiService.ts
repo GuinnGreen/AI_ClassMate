@@ -71,6 +71,7 @@ async function callWithRetry<T>(
 // --- Groq Fallback (OpenAI-compatible API) ---
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 
 async function callGroqFallback(prompt: string): Promise<string> {
   if (!GROQ_API_KEY) {
@@ -101,6 +102,51 @@ async function callGroqFallback(prompt: string): Promise<string> {
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content || "";
   // 清除 Qwen3 可能殘留的 <think>...</think> 標籤
+  return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+}
+
+// --- OpenAI-compatible Vision API (shared by Groq Vision & OpenRouter) ---
+
+async function callOpenAICompatibleVision(
+  apiUrl: string,
+  apiKey: string,
+  model: string,
+  providerName: string,
+  prompt: string,
+  base64Data: string,
+  mimeType: string
+): Promise<string> {
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: `data:${mimeType};base64,${base64Data}` },
+            },
+            { type: "text", text: prompt },
+          ],
+        },
+      ],
+      temperature: 0.2,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`${providerName} API 錯誤 (${response.status}): ${errorBody}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || "";
   return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 }
 
@@ -268,32 +314,85 @@ export const parseScheduleFromImage = async (
 - periodName 只能使用「第一節」到「第七節」
   `;
 
-  try {
-    const daySchedules = await callWithRetry("parseScheduleFromImage", async (client) => {
-      const response = await client.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: {
-          parts: [
-            { inlineData: { mimeType, data: base64Data } },
-            { text: prompt }
-          ]
-        }
-      });
-      const text = response.text || "[]";
-      const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      try {
-        return JSON.parse(jsonStr) as DaySchedule[];
-      } catch {
-        console.error("Failed to parse JSON from AI response:", jsonStr);
-        throw new Error("AI 回傳的格式無法解析，請重試或手動輸入。");
-      }
-    });
-
-    return daySchedules;
-
-  } catch (error: unknown) {
-    const detail = error instanceof Error ? error.message : String(error);
-    console.error("Schedule Parse Error:", detail);
-    throw new Error(`無法辨識課表：${detail}`);
+  // 共用 JSON 解析 helper
+  function parseJsonResponse(text: string): DaySchedule[] {
+    const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    try {
+      return JSON.parse(jsonStr) as DaySchedule[];
+    } catch {
+      console.error("Failed to parse JSON from AI response:", jsonStr);
+      throw new Error("AI 回傳的格式無法解析，請重試或手動輸入。");
+    }
   }
+
+  const errors: string[] = [];
+
+  // --- Layer 1: Gemini ---
+  if (API_KEYS.length > 0) {
+    try {
+      const daySchedules = await callWithRetry("parseScheduleFromImage", async (client) => {
+        const response = await client.models.generateContent({
+          model: 'gemini-2.0-flash',
+          contents: {
+            parts: [
+              { inlineData: { mimeType, data: base64Data } },
+              { text: prompt }
+            ]
+          }
+        });
+        return parseJsonResponse(response.text || "[]");
+      });
+      return daySchedules;
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.warn("[課表辨識] Gemini 失敗:", detail);
+      errors.push(`Gemini: ${detail}`);
+    }
+  }
+
+  // --- Layer 2: Groq Vision ---
+  if (GROQ_API_KEY) {
+    try {
+      console.warn("[課表辨識] 嘗試 Groq Vision 備援...");
+      const text = await callOpenAICompatibleVision(
+        "https://api.groq.com/openai/v1/chat/completions",
+        GROQ_API_KEY,
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "Groq Vision",
+        prompt,
+        base64Data,
+        mimeType
+      );
+      return parseJsonResponse(text);
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.warn("[課表辨識] Groq Vision 失敗:", detail);
+      errors.push(`Groq Vision: ${detail}`);
+    }
+  }
+
+  // --- Layer 3: OpenRouter ---
+  if (OPENROUTER_API_KEY) {
+    try {
+      console.warn("[課表辨識] 嘗試 OpenRouter 備援...");
+      const text = await callOpenAICompatibleVision(
+        "https://openrouter.ai/api/v1/chat/completions",
+        OPENROUTER_API_KEY,
+        "qwen/qwen-2.5-vl-72b-instruct:free",
+        "OpenRouter",
+        prompt,
+        base64Data,
+        mimeType
+      );
+      return parseJsonResponse(text);
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.warn("[課表辨識] OpenRouter 失敗:", detail);
+      errors.push(`OpenRouter: ${detail}`);
+    }
+  }
+
+  // 全部失敗
+  console.error("[課表辨識] 所有 AI 服務皆失敗:", errors);
+  throw new Error(`所有 AI 服務皆無法使用，請稍後再試。\n${errors.join("\n")}`);
 };
