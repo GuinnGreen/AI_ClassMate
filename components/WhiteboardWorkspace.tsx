@@ -17,11 +17,24 @@ const clockSizeMap = [
 ];
 
 const boardFontSizeMap = [
-  { template: 'text-xl',  board: 'text-2xl', lineHeight: '2.75rem' },  // S
-  { template: 'text-2xl', board: 'text-3xl', lineHeight: '3.5rem' },   // M（預設）
-  { template: 'text-3xl', board: 'text-4xl', lineHeight: '4.25rem' },  // L
-  { template: 'text-4xl', board: 'text-5xl', lineHeight: '5.5rem' },   // XL
+  { template: 'text-base lg:text-xl',  board: 'text-lg lg:text-2xl',  lineHeight: '2.75rem', mobileLineHeight: '2rem' },    // S
+  { template: 'text-lg lg:text-2xl',   board: 'text-xl lg:text-3xl',  lineHeight: '3.5rem',  mobileLineHeight: '2.5rem' },   // M（預設）
+  { template: 'text-xl lg:text-3xl',   board: 'text-2xl lg:text-4xl', lineHeight: '4.25rem', mobileLineHeight: '3rem' },     // L
+  { template: 'text-2xl lg:text-4xl',  board: 'text-3xl lg:text-5xl', lineHeight: '5.5rem',  mobileLineHeight: '3.75rem' },  // XL
 ];
+
+const useIsLgScreen = () => {
+  const [isLg, setIsLg] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)').matches : true
+  );
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => setIsLg(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+  return isLg;
+};
 
 export const WhiteboardWorkspace = ({
   userUid,
@@ -47,6 +60,8 @@ export const WhiteboardWorkspace = ({
   const showBoardLines = config.showBoardLines ?? true;
   const boardFontLevel = config.boardFontSizeLevel ?? 1;
   const bf = boardFontSizeMap[boardFontLevel];
+  const isLg = useIsLgScreen();
+  const effectiveLineHeight = isLg ? bf.lineHeight : bf.mobileLineHeight;
 
   const activeSituation = config.activeBoardSituation ?? null;
 
@@ -91,7 +106,7 @@ export const WhiteboardWorkspace = ({
     ? { writingMode, textOrientation: 'upright' as const }
     : { writingMode };
 
-  const noLinesStyle = !showBoardLines ? { lineHeight: bf.lineHeight } : {};
+  const noLinesStyle = !showBoardLines ? { lineHeight: effectiveLineHeight } : {};
 
   useEffect(() => {
     setBoardContent(config.class_board || '');
@@ -158,7 +173,7 @@ export const WhiteboardWorkspace = ({
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
         {/* Left: Whiteboard (2/3) */}
-        <div className={`flex-[2] ${theme.surface} rounded-3xl border ${theme.border} shadow-sm overflow-hidden flex flex-col`} style={{ '--board-line-height': bf.lineHeight } as React.CSSProperties}>
+        <div className={`flex-[2] ${theme.surface} rounded-3xl border ${theme.border} shadow-sm overflow-hidden flex flex-col`} style={{ '--board-line-height': effectiveLineHeight } as React.CSSProperties}>
 
           {/* Board toolbar */}
           <div className={`p-4 border-b ${theme.border} flex flex-wrap justify-between items-center gap-2 ${theme.surfaceAlt}`}>
