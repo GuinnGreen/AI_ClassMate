@@ -417,6 +417,23 @@ export const StudentDetailWorkspace = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* 今日請假 */}
+            <div className={`flex items-center gap-1 ${theme.surfaceAlt} p-1.5 rounded-xl`}>
+              <BookX className={`w-4 h-4 ${theme.textLight} ml-1`} />
+              {ABSENCE_TYPES.map(type => (
+                <button
+                  key={type}
+                  onClick={() => handleSetAbsence(type)}
+                  className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all
+                    ${todayAbsence === type
+                      ? `${theme.primary} text-white shadow`
+                      : `${theme.textLight} hover:${theme.text}`
+                    }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => { setPendingAction('notes'); setShowPasswordModal(true); }}
               className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} transition text-sm font-bold`}
@@ -510,27 +527,6 @@ export const StudentDetailWorkspace = ({
                   <button onClick={() => setIsBehaviorSettingsOpen(true)} className={`p-2 rounded-lg hover:${theme.surfaceAlt} ${theme.textLight} transition`} title="自訂按鈕">
                     <Settings className="w-4 h-4" />
                   </button>
-                </div>
-
-                <div className={`${theme.surface} p-4 rounded-2xl border ${theme.border} shadow-sm`}>
-                  <h3 className={`text-sm font-bold ${theme.textLight} mb-3 flex items-center gap-2`}>
-                    <BookX className="w-4 h-4" /> 今日請假
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {ABSENCE_TYPES.map(type => (
-                      <button
-                        key={type}
-                        onClick={() => handleSetAbsence(type)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border
-                          ${todayAbsence === type
-                            ? `${theme.primary} text-white border-transparent shadow`
-                            : `${theme.surfaceAlt} ${theme.textLight} ${theme.border} hover:opacity-80`
-                          }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 <div className={`${theme.surface} p-3 lg:p-5 rounded-2xl border ${theme.border} shadow-sm`}>
