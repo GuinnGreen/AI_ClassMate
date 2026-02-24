@@ -105,6 +105,38 @@ async function callGroqFallback(prompt: string): Promise<string> {
   return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 }
 
+// --- OpenRouter Text Fallback (for comment generation) ---
+
+async function callOpenRouterTextFallback(prompt: string): Promise<string> {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error("未設定 OPENROUTER_API_KEY，無法使用備援 AI");
+  }
+
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "qwen/qwen-2.5-72b-instruct:free",
+      messages: [
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`OpenRouter API 錯誤 (${response.status}): ${errorBody}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || "";
+  return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+}
+
 // --- OpenAI-compatible Vision API (shared by Groq Vision & OpenRouter) ---
 
 async function callOpenAICompatibleVision(
@@ -248,6 +280,17 @@ export const generateStudentComment = async (
         if (fallbackText) return fallbackText;
       } catch (groqError: unknown) {
         console.error("[AI] Groq fallback 也失敗:", groqError);
+      }
+    }
+
+    // OpenRouter fallback（第三層備援）
+    if (OPENROUTER_API_KEY) {
+      try {
+        console.warn("[AI] Groq 也失敗，嘗試 OpenRouter fallback...");
+        const fallbackText = await callOpenRouterTextFallback(prompt);
+        if (fallbackText) return fallbackText;
+      } catch (openRouterError: unknown) {
+        console.error("[AI] OpenRouter fallback 也失敗:", openRouterError);
       }
     }
 
