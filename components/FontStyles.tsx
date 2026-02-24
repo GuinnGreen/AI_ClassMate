@@ -51,5 +51,9 @@ export const FontStyles = () => (
         rgba(255, 255, 255, 0.12) 1px
       );
     }
+
+    .notebook-paper-vertical-rl {
+      background-position: right top;
+    }
   `}</style>
 );

@@ -67,7 +67,9 @@ export const WhiteboardWorkspace = ({
 
   const paperClass = !showBoardLines
     ? ''
-    : writingMode === 'horizontal-tb' ? 'notebook-paper' : 'notebook-paper-vertical';
+    : writingMode === 'horizontal-tb'
+      ? 'notebook-paper'
+      : `notebook-paper-vertical${writingMode === 'vertical-rl' ? ' notebook-paper-vertical-rl' : ''}`;
 
   const verticalStyle = writingMode !== 'horizontal-tb'
     ? { writingMode, textOrientation: 'upright' as const }
