@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { Users, Upload } from 'lucide-react';
+import { Users, Upload, PanelLeftOpen } from 'lucide-react';
 import { auth } from './firebase';
 import { LIGHT_THEME, DARK_THEME } from './constants/theme';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -34,6 +34,10 @@ export default function App() {
   const [fontSizeLevel, setFontSizeLevel] = useState(1);
   const [clockSizeLevel, setClockSizeLevel] = useState(1);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebar-desktop-collapsed') === 'true'; }
+    catch { return false; }
+  });
   const napAutoActiveRef = useRef(false);
   const preNapDarkRef = useRef(false);
   const isDarkModeRef = useRef(false);
@@ -47,6 +51,11 @@ export default function App() {
   const [showDeleteAuth, setShowDeleteAuth] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
+
+  useEffect(() => {
+    try { localStorage.setItem('sidebar-desktop-collapsed', String(isSidebarCollapsed)); }
+    catch { /* ignore */ }
+  }, [isSidebarCollapsed]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -182,6 +191,15 @@ export default function App() {
       <ThemeProvider value={theme}>
         <div className={`flex h-dvh w-full ${theme.bg} font-sans ${getFontSizeClass()} transition-colors duration-300`}>
           <FontStyles />
+          {isSidebarCollapsed && (
+            <button
+              onClick={() => setIsSidebarCollapsed(false)}
+              className={`hidden lg:flex fixed left-4 top-4 z-50 p-2 rounded-lg ${theme.surface} shadow-md border ${theme.border} hover:shadow-lg transition-all`}
+              title="展開側邊欄"
+            >
+              <PanelLeftOpen className={`w-5 h-5 ${theme.text}`} />
+            </button>
+          )}
           <Sidebar
             students={students}
             selectedStudentId={selectedStudentId}
@@ -202,8 +220,10 @@ export default function App() {
             onConfigUpdate={setClassConfig}
             userUid={user!.uid}
             user={user!}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebarCollapse={() => setIsSidebarCollapsed(prev => !prev)}
           />
-          <div className="flex-1 flex flex-col h-full overflow-hidden p-3 lg:p-4 relative">
+          <div className={`flex-1 flex flex-col h-full overflow-hidden p-3 lg:p-4 relative transition-[margin] duration-300 ease-in-out ${isSidebarCollapsed ? 'lg:ml-0' : 'lg:ml-72'}`}>
             <div className={`flex-1 overflow-hidden rounded-3xl shadow-sm border ${theme.border} ${theme.surface} relative`}>
               {students.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 animate-fade-in">

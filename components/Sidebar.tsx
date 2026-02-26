@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Users, LogOut, School, Edit3, Moon, Sun,
-  Plus, Minus, Type, Sunset, BarChart2, Calendar
+  Plus, Minus, Type, Sunset, BarChart2, Calendar, PanelLeftClose
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { useTheme } from '../contexts/ThemeContext';
@@ -28,6 +28,8 @@ export const Sidebar = ({
   onConfigUpdate,
   userUid,
   user,
+  isSidebarCollapsed,
+  onToggleSidebarCollapse,
 }: {
   students: Student[];
   selectedStudentId: string | null;
@@ -45,6 +47,8 @@ export const Sidebar = ({
   onConfigUpdate: (config: ClassConfig) => void;
   userUid: string;
   user: User;
+  isSidebarCollapsed: boolean;
+  onToggleSidebarCollapse: () => void;
 }) => {
   const theme = useTheme();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -88,18 +92,27 @@ export const Sidebar = ({
       <div className={`
         fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-300 ease-in-out
         pt-[env(safe-area-inset-top,0px)] lg:pt-0
-        lg:static lg:translate-x-0
+        ${isSidebarCollapsed ? 'lg:-translate-x-full' : 'lg:translate-x-0'}
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
         ${theme.surfaceAlt} border-r ${theme.border}
         flex flex-col h-full
       `}>
         {/* Header Section */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700 shrink-0">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => onSelectStudent(null)}>
-            <div className={`p-2 rounded-xl ${theme.primary} text-white shadow-lg`}>
-              <School className="w-6 h-6" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => onSelectStudent(null)}>
+              <div className={`p-2 rounded-xl ${theme.primary} text-white shadow-lg`}>
+                <School className="w-6 h-6" />
+              </div>
+              <h1 className={`font-bold text-xl ${theme.text} tracking-tight`}>主畫面</h1>
             </div>
-            <h1 className={`font-bold text-xl ${theme.text} tracking-tight`}>主畫面</h1>
+            <button
+              onClick={onToggleSidebarCollapse}
+              className={`hidden lg:flex p-2 rounded-lg hover:${theme.surface} ${theme.textLight} hover:${theme.text} transition`}
+              title="收合側邊欄"
+            >
+              <PanelLeftClose className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
