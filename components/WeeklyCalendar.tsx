@@ -8,10 +8,12 @@ export const WeeklyCalendar = ({
   currentDate,
   onDateSelect,
   student,
+  onViewModeChange,
 }: {
   currentDate: string;
   onDateSelect: (date: string) => void;
   student: Student;
+  onViewModeChange?: (mode: 'week' | 'month') => void;
 }) => {
   const theme = useTheme();
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | ''>('');
@@ -153,7 +155,7 @@ export const WeeklyCalendar = ({
     : `${days[0].getFullYear()}年 ${days[0].getMonth() + 1}月`;
 
   return (
-    <div className={`${theme.surface} rounded-2xl p-4 shadow-sm border ${theme.border}`}>
+    <div className={`${theme.surface} rounded-2xl p-4 shadow-sm border ${theme.border} ${viewMode === 'month' ? 'lg:flex-1 lg:flex lg:flex-col' : ''}`}>
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={viewMode === 'month' ? handlePrevMonth : handlePrevWeek}
@@ -162,7 +164,11 @@ export const WeeklyCalendar = ({
           <ChevronLeft className="w-5 h-5" />
         </button>
         <button
-          onClick={() => setViewMode(v => v === 'week' ? 'month' : 'week')}
+          onClick={() => setViewMode(v => {
+            const next = v === 'week' ? 'month' : 'week';
+            onViewModeChange?.(next);
+            return next;
+          })}
           className={`flex items-center gap-1 text-base font-bold ${theme.text} hover:opacity-70 transition-opacity`}
         >
           {headerTitle}
@@ -176,7 +182,7 @@ export const WeeklyCalendar = ({
         </button>
       </div>
 
-      <div className={`calendar-view-transition ${viewMode === 'month' ? 'calendar-view-month' : 'calendar-view-week'}`}>
+      <div className={`calendar-view-transition ${viewMode === 'month' ? 'calendar-view-month lg:!max-h-none lg:flex-1 lg:flex lg:flex-col' : 'calendar-view-week'}`}>
         {viewMode === 'week' ? (
           <div className="overflow-x-hidden py-1">
             <div
@@ -188,15 +194,16 @@ export const WeeklyCalendar = ({
             </div>
           </div>
         ) : (
-          <div className="overflow-x-hidden">
-            <div className="grid grid-cols-7 gap-1 mb-1">
+          <div className="overflow-x-hidden lg:flex-1 lg:flex lg:flex-col">
+            <div className="grid grid-cols-7 gap-1 mb-1 shrink-0">
               {weekDays.map(wd => (
                 <div key={wd} className={`text-center text-[10px] font-bold opacity-50 ${theme.text}`}>{wd}</div>
               ))}
             </div>
             <div
               key={`${monthGrid.year}-${monthGrid.month}`}
-              className={`grid grid-cols-7 gap-1 ${slideDirection === 'left' ? 'animate-slide-in-left' : slideDirection === 'right' ? 'animate-slide-in-right' : ''}`}
+              className={`grid grid-cols-7 gap-1 lg:flex-1 ${slideDirection === 'left' ? 'animate-slide-in-left' : slideDirection === 'right' ? 'animate-slide-in-right' : ''}`}
+              style={{ gridTemplateRows: 'repeat(6, 1fr)' }}
               onAnimationEnd={() => setSlideDirection('')}
             >
               {monthGrid.cells.map((d, i) => renderDayCell(d, {

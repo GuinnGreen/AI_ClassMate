@@ -56,6 +56,7 @@ export const StudentDetailWorkspace = ({
   const { canGenerate, cooldownRemaining, dailyUsageCount, dailyLimit, isLimitReached, recordGeneration } = useAiRateLimit({ userUid });
   const [mode, setMode] = useState<'daily' | 'ai'>('daily');
   const [mobileTab, setMobileTab] = useState<'record' | 'scoring'>('scoring');
+  const [calendarViewMode, setCalendarViewMode] = useState<'week' | 'month'>('week');
   const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
 
   // Note & Security State
@@ -473,8 +474,8 @@ export const StudentDetailWorkspace = ({
           {mode === 'daily' ? (
             <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
               <div className={`flex-1 flex flex-col border-r ${theme.border} ${theme.bg} p-3 lg:p-6 h-auto lg:h-full lg:overflow-y-auto shrink-0`}>
-                <div className="mb-3 lg:mb-6 shrink-0">
-                  <WeeklyCalendar currentDate={currentDate} onDateSelect={setCurrentDate} student={student} />
+                <div className={`shrink-0 ${calendarViewMode === 'month' ? 'lg:flex-1 lg:flex lg:flex-col lg:mb-0 mb-3' : 'mb-3 lg:mb-6'}`}>
+                  <WeeklyCalendar currentDate={currentDate} onDateSelect={setCurrentDate} student={student} onViewModeChange={setCalendarViewMode} />
                 </div>
 
                 <div className={`flex ${theme.surfaceAlt} p-1.5 rounded-xl mb-3 lg:hidden`}>
@@ -494,7 +495,7 @@ export const StudentDetailWorkspace = ({
                   </button>
                 </div>
 
-                <div className={`flex-1 flex flex-col min-h-[400px] lg:min-h-0 ${mobileTab !== 'record' ? 'hidden lg:flex' : ''}`}>
+                <div className={`flex-1 flex flex-col min-h-[400px] lg:min-h-0 ${mobileTab !== 'record' ? 'hidden lg:flex' : ''} ${calendarViewMode === 'month' ? 'lg:hidden' : ''}`}>
                   <h3 className={`font-bold ${theme.text} mb-2 shrink-0`}>當日紀錄</h3>
                   <div className="flex-1 grid grid-cols-2 gap-3 lg:gap-4 min-h-0">
                     <div className={`rounded-2xl p-3 lg:p-4 border ${theme.border} ${theme.surface} h-fit`}>
