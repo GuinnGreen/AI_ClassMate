@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ClipboardList, Clock, Settings, Calendar as CalendarIcon, Minus, Plus, LayoutTemplate, Eye, EyeOff } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { getCurrentTime } from '../utils/date';
@@ -64,6 +64,8 @@ export const WhiteboardWorkspace = ({
   const [showScheduleEditor, setShowScheduleEditor] = useState(false);
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [showTomorrow, setShowTomorrow] = useState(false);
+  const [showLayoutMenu, setShowLayoutMenu] = useState(false);
+  const layoutMenuRef = useRef<HTMLDivElement>(null);
   const writingMode: BoardWritingMode = config.boardWritingMode ?? 'horizontal-tb';
   const showClock = config.showClock ?? true;
   const showBoardLines = config.showBoardLines ?? true;
@@ -85,6 +87,19 @@ export const WhiteboardWorkspace = ({
     if (onConfigUpdate) onConfigUpdate(newConfig);
     await updateClassConfig(userUid, newConfig);
   };
+
+  useEffect(() => {
+    if (!showLayoutMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (layoutMenuRef.current && !layoutMenuRef.current.contains(e.target as Node)) {
+        setShowLayoutMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showLayoutMenu]);
+
+  const layoutLabel = writingMode === 'horizontal-tb' ? '橫' : writingMode === 'vertical-lr' ? '直→' : '直←';
 
   const setActiveSituation = async (id: string | null) => {
     const newConfig = { ...config, activeBoardSituation: id };
@@ -283,30 +298,53 @@ export const WhiteboardWorkspace = ({
                 <LayoutTemplate className="w-4 h-4" />
               </button>
 
-              {/* Lines toggle */}
-              <button
-                onClick={toggleLines}
-                className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition ${
-                  showBoardLines
-                    ? `${theme.primary} text-white border-transparent`
-                    : `${theme.surface} ${theme.text} ${theme.border}`
-                }`}
-                title="顯示/隱藏底線"
-              >
-                ≡
-              </button>
-
-              {/* Writing mode */}
-              <div className={`flex rounded-lg border ${theme.border} overflow-hidden text-xs font-bold`}>
-                {writingModeOptions.map(({ mode, label }) => (
-                  <button
-                    key={mode}
-                    onClick={() => setWritingMode(mode)}
-                    className={`px-2.5 py-1.5 transition ${writingMode === mode ? `${theme.primary} text-white` : `${theme.surface} ${theme.text} hover:opacity-80`}`}
-                  >
-                    {label}
-                  </button>
-                ))}
+              {/* Layout settings (writing mode + lines) */}
+              <div className="relative" ref={layoutMenuRef}>
+                <button
+                  onClick={() => setShowLayoutMenu(v => !v)}
+                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition ${
+                    showLayoutMenu
+                      ? `${theme.primary} text-white border-transparent`
+                      : `${theme.surface} ${theme.text} ${theme.border} hover:opacity-80`
+                  }`}
+                  title="版面設定"
+                >
+                  {layoutLabel}{showBoardLines ? ' ≡' : ''}
+                </button>
+                {showLayoutMenu && (
+                  <div className={`absolute right-0 top-full mt-1 z-50 ${theme.surface} border ${theme.border} rounded-xl shadow-lg p-2 min-w-[140px]`}>
+                    <div className={`text-xs font-bold ${theme.textLight} px-2 py-1`}>書寫方向</div>
+                    <div className="flex flex-col gap-0.5">
+                      {writingModeOptions.map(({ mode, label }) => (
+                        <button
+                          key={mode}
+                          onClick={() => setWritingMode(mode)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold text-left transition ${
+                            writingMode === mode
+                              ? `${theme.primary} text-white`
+                              : `${theme.text} hover:${theme.surfaceAlt}`
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className={`border-t ${theme.border} my-1.5`} />
+                    <button
+                      onClick={toggleLines}
+                      className={`w-full px-3 py-1.5 rounded-lg text-xs font-bold text-left transition flex items-center justify-between ${theme.text} hover:${theme.surfaceAlt}`}
+                    >
+                      顯示底線
+                      <span className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
+                        showBoardLines
+                          ? `${theme.primary} text-white border-transparent`
+                          : `${theme.border}`
+                      }`}>
+                        {showBoardLines ? '✓' : ''}
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Edit / Save daily notes */}

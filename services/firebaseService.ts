@@ -71,19 +71,23 @@ export const addPointToAllStudents = async (
   students: Student[],
   currentDate: string,
   behavior: { label: string; value: number }
-) => {
+): Promise<number> => {
   const batch = writeBatch(db);
+  let count = 0;
   for (const student of students) {
-    const studentRef = doc(db, `users/${userUid}/students/${student.id}`);
     const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
+    if (currentDayRecord.absence) continue;
+    const studentRef = doc(db, `users/${userUid}/students/${student.id}`);
     const newPoint: PointLog = { id: crypto.randomUUID(), label: behavior.label, value: behavior.value, timestamp: Date.now() };
     const updatedPoints = [...currentDayRecord.points, newPoint];
     batch.update(studentRef, {
       totalScore: increment(behavior.value),
       [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note, absence: currentDayRecord.absence ?? null }
     });
+    count++;
   }
   await batch.commit();
+  return count;
 };
 
 export const deletePointFromStudent = async (

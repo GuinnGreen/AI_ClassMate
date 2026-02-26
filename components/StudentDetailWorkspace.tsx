@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   ChevronLeft, Sparkles, Save, Trash2, ClipboardList,
   Smile, Frown, School, Clock, Settings, Copy, AlignLeft,
@@ -188,8 +188,18 @@ export const StudentDetailWorkspace = ({
 
   const [isClassMode, setIsClassMode] = useState(false);
 
+  const absentCount = useMemo(() =>
+    students.filter(s => s.dailyRecords[currentDate]?.absence).length,
+    [students, currentDate]
+  );
+  const targetCount = students.length - absentCount;
+
   const handleAddPoint = async (behavior: BehaviorButton) => {
     if (isClassMode) {
+      const msg = absentCount > 0
+        ? `確定為全班 ${targetCount} 位同學（排除 ${absentCount} 位請假）加「${behavior.label}」(${behavior.value > 0 ? '+' : ''}${behavior.value})？`
+        : `確定為全班 ${targetCount} 位同學加「${behavior.label}」(${behavior.value > 0 ? '+' : ''}${behavior.value})？`;
+      if (!window.confirm(msg)) return;
       await addPointToAllStudents(userUid, students, currentDate, behavior);
     } else {
       const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
@@ -614,7 +624,9 @@ export const StudentDetailWorkspace = ({
                 </div>
                 {isClassMode && (
                   <div className={`px-3 py-2 rounded-xl text-xs font-bold text-center ${theme.primary} text-white`}>
-                    全班加分模式：點選按鈕將為全班 {students.length} 位同學加分
+                    全班加分模式：{absentCount > 0
+                      ? `將為 ${targetCount} 位到校同學加分（${absentCount} 位請假排除）`
+                      : `將為全班 ${students.length} 位同學加分`}
                   </div>
                 )}
 
