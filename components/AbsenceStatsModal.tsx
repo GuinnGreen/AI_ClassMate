@@ -41,6 +41,7 @@ export const AbsenceStatsModal = ({
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [mode, setMode] = useState<'month' | 'semester'>('month');
+  const [showOnlyAbsent, setShowOnlyAbsent] = useState(false);
 
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
@@ -80,7 +81,7 @@ export const AbsenceStatsModal = ({
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ student, counts, total }) => (
+          {rows.filter(r => showOnlyAbsent ? r.total > 0 : true).map(({ student, counts, total }) => (
             <tr
               key={student.id}
               className={`border-t ${theme.border} ${total > 0 ? 'bg-orange-50 dark:bg-orange-900/10' : ''}`}
@@ -152,7 +153,13 @@ export const AbsenceStatsModal = ({
             </div>
             {!hasAnyAbsence ? (
               <div className={`text-center py-8 text-sm ${theme.textLight}`}>當月無請假紀錄</div>
-            ) : renderTable()}
+            ) : (<>
+              <label className={`flex items-center gap-2 text-sm ${theme.textLight} cursor-pointer select-none`}>
+                <input type="checkbox" checked={showOnlyAbsent} onChange={e => setShowOnlyAbsent(e.target.checked)} className="rounded" />
+                只顯示有請假的學生
+              </label>
+              {renderTable()}
+            </>)}
           </>
         )}
 
@@ -167,7 +174,13 @@ export const AbsenceStatsModal = ({
                 </div>
                 {!hasAnyAbsence ? (
                   <div className={`text-center py-8 text-sm ${theme.textLight}`}>學期期間無請假紀錄</div>
-                ) : renderTable()}
+                ) : (<>
+                  <label className={`flex items-center gap-2 text-sm ${theme.textLight} cursor-pointer select-none`}>
+                    <input type="checkbox" checked={showOnlyAbsent} onChange={e => setShowOnlyAbsent(e.target.checked)} className="rounded" />
+                    只顯示有請假的學生
+                  </label>
+                  {renderTable()}
+                </>)}
               </>
             )}
           </>

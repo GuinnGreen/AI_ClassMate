@@ -46,15 +46,11 @@
 .animate-slide-in-left  { animation: slide-in-left  250ms ease-out; }
 .animate-slide-in-right { animation: slide-in-right 250ms ease-out; }
 
-/* Calendar expand/collapse */
-.calendar-view-transition {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition: max-height 300ms ease-in-out;
-  overflow: hidden;
+@keyframes fade-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: scale(1); }
 }
-.calendar-view-week { max-height: 90px; }
-.calendar-view-month { max-height: 340px; }
+.animate-fade-in { animation: fade-in 200ms ease-out; }
 
 /* Animation for click feedback (Deletion) */
 .active-shrink:active {

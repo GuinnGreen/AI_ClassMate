@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ClipboardList, Clock, Settings, Calendar as CalendarIcon, Minus, Plus, LayoutTemplate } from 'lucide-react';
+import { ClipboardList, Clock, Settings, Calendar as CalendarIcon, Minus, Plus, LayoutTemplate, Eye, EyeOff } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { getCurrentTime } from '../utils/date';
 import { isCurrentPeriod, getPeriodParts } from '../utils/schedule';
@@ -65,6 +65,7 @@ export const WhiteboardWorkspace = ({
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [showTomorrow, setShowTomorrow] = useState(false);
   const writingMode: BoardWritingMode = config.boardWritingMode ?? 'horizontal-tb';
+  const showClock = config.showClock ?? true;
   const showBoardLines = config.showBoardLines ?? true;
   const boardFontLevel = config.boardFontSizeLevel ?? 1;
   const bf = boardFontSizeMap[boardFontLevel];
@@ -87,6 +88,12 @@ export const WhiteboardWorkspace = ({
 
   const setActiveSituation = async (id: string | null) => {
     const newConfig = { ...config, activeBoardSituation: id };
+    if (onConfigUpdate) onConfigUpdate(newConfig);
+    await updateClassConfig(userUid, newConfig);
+  };
+
+  const toggleClock = async () => {
+    const newConfig = { ...config, showClock: !showClock };
     if (onConfigUpdate) onConfigUpdate(newConfig);
     await updateClassConfig(userUid, newConfig);
   };
@@ -163,32 +170,51 @@ export const WhiteboardWorkspace = ({
   return (
     <div className="flex flex-col h-full p-3 lg:p-8 overflow-hidden">
       {/* Header */}
-      <div className="group flex flex-col lg:flex-row lg:justify-between lg:items-center mb-3 lg:mb-6 gap-1 lg:gap-0 shrink-0 pl-11 lg:pl-0">
-        <div className="flex items-center gap-2 relative">
-          <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex gap-0.5 mr-1">
-            <button
-              onClick={() => setClockSizeLevel?.(Math.max(0, clockSizeLevel - 1))}
-              disabled={clockSizeLevel === 0}
-              className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition"
-            >
-              <Minus className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setClockSizeLevel?.(Math.min(3, clockSizeLevel + 1))}
-              disabled={clockSizeLevel === 3}
-              className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
+      {showClock ? (
+        <div className="group flex flex-col lg:flex-row lg:justify-between lg:items-center mb-3 lg:mb-6 gap-1 lg:gap-0 shrink-0 pl-11 lg:pl-0">
+          <div className="flex items-center gap-2 relative">
+            <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex gap-0.5 mr-1">
+              <button
+                onClick={toggleClock}
+                className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition"
+                title="隱藏時鐘"
+              >
+                <EyeOff className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setClockSizeLevel?.(Math.max(0, clockSizeLevel - 1))}
+                disabled={clockSizeLevel === 0}
+                className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setClockSizeLevel?.(Math.min(3, clockSizeLevel + 1))}
+                disabled={clockSizeLevel === 3}
+                className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <Clock className={`${cs.clockIcon} ${theme.textLight} shrink-0`} />
+            <h1 className={`${theme.text} ${cs.time} font-extrabold tracking-tight tabular-nums leading-none`}>{currentTime.time}</h1>
           </div>
-          <Clock className={`${cs.clockIcon} ${theme.textLight} shrink-0`} />
-          <h1 className={`${theme.text} ${cs.time} font-extrabold tracking-tight tabular-nums leading-none`}>{currentTime.time}</h1>
+          <div className="flex items-center gap-2">
+            <CalendarIcon className={`${cs.calIcon} ${theme.textLight} shrink-0`} />
+            <p className={`${theme.text} ${cs.date} font-semibold tracking-wide`}>{currentTime.date}</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <CalendarIcon className={`${cs.calIcon} ${theme.textLight} shrink-0`} />
-          <p className={`${theme.text} ${cs.date} font-semibold tracking-wide`}>{currentTime.date}</p>
+      ) : (
+        <div className="flex justify-end mb-2 shrink-0 pl-11 lg:pl-0">
+          <button
+            onClick={toggleClock}
+            className={`p-1.5 rounded-lg hover:${theme.surfaceAlt} ${theme.textLight} transition`}
+            title="顯示時鐘"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-3 lg:gap-6 flex-1 min-h-0">
         {/* Left: Whiteboard (2/3) */}

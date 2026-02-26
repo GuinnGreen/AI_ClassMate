@@ -2,13 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ChevronLeft, Sparkles, Save, Trash2, ClipboardList,
   Smile, Frown, School, Clock, Settings, Copy, AlignLeft,
-  Check, Lock, Download, BookX
+  Check, Lock, Download, BookX, Users
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatDate } from '../utils/date';
 import { levenshteinDistance } from '../utils/levenshtein';
 import {
   addPointToStudent,
+  addPointToAllStudents,
   deletePointFromStudent,
   toggleStudentTag,
   updateStudentComment,
@@ -115,7 +116,7 @@ export const StudentDetailWorkspace = ({
         if (!hasPoints && !hasNote) continue;
 
         const row: string[] = [
-          String((s.order ?? 0) + 1),
+          String(s.seatNumber ?? (s.order ?? 0) + 1),
           s.name,
           date,
         ];
@@ -185,9 +186,15 @@ export const StudentDetailWorkspace = ({
     if (onConfigUpdate) onConfigUpdate(newConfig);
   };
 
+  const [isClassMode, setIsClassMode] = useState(false);
+
   const handleAddPoint = async (behavior: BehaviorButton) => {
-    const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
-    await addPointToStudent(userUid, student.id, currentDate, currentDayRecord, behavior);
+    if (isClassMode) {
+      await addPointToAllStudents(userUid, students, currentDate, behavior);
+    } else {
+      const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
+      await addPointToStudent(userUid, student.id, currentDate, currentDayRecord, behavior);
+    }
   };
 
   const handleDeleteGroup = async (label: string) => {
@@ -259,17 +266,19 @@ export const StudentDetailWorkspace = ({
   };
 
   const todayAbsence = (student.dailyRecords[currentDate] || { absence: null }).absence ?? null;
+  const [isAbsenceExpanded, setIsAbsenceExpanded] = useState(false);
 
   const handleSetAbsence = async (type: AbsenceType) => {
     const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
     const newAbsence = todayAbsence === type ? null : type;
     await setStudentAbsence(userUid, student.id, currentDate, currentDayRecord, newAbsence);
+    setIsAbsenceExpanded(false);
   };
 
   // --- AI Logic ---
   const [isGenerating, setIsGenerating] = useState(false);
   const [tempComment, setTempComment] = useState(student.comment);
-  const [commentLength, setCommentLength] = useState<number>(150);
+  const [commentLength, setCommentLength] = useState<number>(100);
   const [customPrompt, setCustomPrompt] = useState('');
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
   const [originalAiText, setOriginalAiText] = useState(student.originalAiComment || "");
@@ -287,12 +296,14 @@ export const StudentDetailWorkspace = ({
 
   useEffect(() => clearTimers, [clearTimers]);
 
+  const prevStudentId = useRef(student.id);
   useEffect(() => {
-    setTempComment(student.comment);
-    if (student.originalAiComment) {
-      setOriginalAiText(student.originalAiComment);
+    if (prevStudentId.current !== student.id) {
+      setTempComment(student.comment);
+      setOriginalAiText(student.originalAiComment || '');
+      prevStudentId.current = student.id;
     }
-  }, [student.comment, student.originalAiComment]);
+  }, [student.id, student.comment, student.originalAiComment]);
 
   const handleToggleTag = async (tag: string) => {
     await toggleStudentTag(userUid, student.id, tag, student.tags);
@@ -431,21 +442,44 @@ export const StudentDetailWorkspace = ({
           <div className="flex items-center gap-1 lg:gap-2 flex-nowrap overflow-x-auto">
             {/* 今日請假 */}
             <div className={`flex items-center gap-1 ${theme.surfaceAlt} p-1.5 rounded-xl`}>
-              <BookX className={`w-4 h-4 ${theme.textLight} ml-1`} />
-              {ABSENCE_TYPES.map(type => (
-                <button
-                  key={type}
-                  onClick={() => handleSetAbsence(type)}
-                  className={`px-2 py-1.5 lg:px-2.5 text-xs font-bold rounded-lg transition-all
-                    ${todayAbsence === type
-                      ? `${theme.primary} text-white shadow`
-                      : `${theme.textLight} hover:${theme.text}`
-                    }`}
-                >
-                  <span className="lg:hidden">{type[0]}</span>
-                  <span className="hidden lg:inline">{type}</span>
-                </button>
-              ))}
+              {!isAbsenceExpanded ? (
+                todayAbsence ? (
+                  <button
+                    onClick={() => handleSetAbsence(todayAbsence)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all ${theme.primary} text-white shadow`}
+                    title="點擊取消請假"
+                  >
+                    <BookX className="w-4 h-4" />
+                    <span>{todayAbsence}</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsAbsenceExpanded(true)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all ${theme.textLight} hover:${theme.text}`}
+                  >
+                    <BookX className="w-4 h-4" />
+                    <span>假</span>
+                  </button>
+                )
+              ) : (
+                <>
+                  <BookX className={`w-4 h-4 ${theme.textLight} ml-1 shrink-0`} />
+                  {ABSENCE_TYPES.map(type => (
+                    <button
+                      key={type}
+                      onClick={() => handleSetAbsence(type)}
+                      className={`px-2 py-1.5 lg:px-2.5 text-xs font-bold rounded-lg transition-all animate-fade-in
+                        ${todayAbsence === type
+                          ? `${theme.primary} text-white shadow`
+                          : `${theme.textLight} hover:${theme.text}`
+                        }`}
+                    >
+                      <span className="lg:hidden">{type[0]}</span>
+                      <span className="hidden lg:inline">{type}</span>
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
             <button
               onClick={() => { setPendingAction('notes'); setShowPasswordModal(true); }}
@@ -473,8 +507,14 @@ export const StudentDetailWorkspace = ({
         <div className="flex-1 relative overflow-hidden">
           {mode === 'daily' ? (
             <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
-              <div className={`flex-1 flex flex-col border-r ${theme.border} ${theme.bg} p-3 lg:p-6 h-auto lg:h-full lg:overflow-y-auto shrink-0`}>
-                <div className={`shrink-0 ${calendarViewMode === 'month' ? 'lg:flex-1 lg:flex lg:flex-col lg:mb-0 mb-3' : 'mb-3 lg:mb-6'}`}>
+              <div
+                className={`flex-1 flex flex-col lg:!grid border-r ${theme.border} ${theme.bg} p-3 lg:p-6 h-auto lg:h-full lg:overflow-hidden shrink-0`}
+                style={{
+                  gridTemplateRows: calendarViewMode === 'month' ? '1fr 0fr' : 'auto 1fr',
+                  transition: 'grid-template-rows 400ms ease-in-out',
+                }}
+              >
+                <div className="shrink-0 mb-3 lg:mb-0 lg:min-h-0">
                   <WeeklyCalendar currentDate={currentDate} onDateSelect={setCurrentDate} student={student} onViewModeChange={setCalendarViewMode} />
                 </div>
 
@@ -495,7 +535,7 @@ export const StudentDetailWorkspace = ({
                   </button>
                 </div>
 
-                <div className={`flex-1 flex flex-col min-h-[400px] lg:min-h-0 ${mobileTab !== 'record' ? 'hidden lg:flex' : ''} ${calendarViewMode === 'month' ? 'lg:hidden' : ''}`}>
+                <div className={`flex-1 flex flex-col min-h-[400px] lg:min-h-0 lg:overflow-hidden ${mobileTab !== 'record' ? 'hidden lg:flex' : ''}`}>
                   <h3 className={`font-bold ${theme.text} mb-2 shrink-0`}>當日紀錄</h3>
                   <div className="flex-1 grid grid-cols-2 gap-3 lg:gap-4 min-h-0">
                     <div className={`rounded-2xl p-3 lg:p-4 border ${theme.border} ${theme.surface} h-fit`}>
@@ -554,10 +594,29 @@ export const StudentDetailWorkspace = ({
                   <h3 className={`text-sm font-bold ${theme.textLight} uppercase tracking-wide flex items-center gap-2`}>
                     <Clock className="w-4 h-4" /> 快速記分板
                   </h3>
-                  <button onClick={() => setIsBehaviorSettingsOpen(true)} className={`p-2 rounded-lg hover:${theme.surfaceAlt} ${theme.textLight} transition`} title="自訂按鈕">
-                    <Settings className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setIsClassMode(prev => !prev)}
+                      className={`p-2 rounded-lg transition flex items-center gap-1.5 text-xs font-bold
+                        ${isClassMode
+                          ? `${theme.primary} text-white shadow`
+                          : `hover:${theme.surfaceAlt} ${theme.textLight}`
+                        }`}
+                      title={isClassMode ? '目前：全班加分模式' : '切換為全班加分'}
+                    >
+                      <Users className="w-4 h-4" />
+                      <span className="hidden lg:inline">{isClassMode ? '全班' : ''}</span>
+                    </button>
+                    <button onClick={() => setIsBehaviorSettingsOpen(true)} className={`p-2 rounded-lg hover:${theme.surfaceAlt} ${theme.textLight} transition`} title="自訂按鈕">
+                      <Settings className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
+                {isClassMode && (
+                  <div className={`px-3 py-2 rounded-xl text-xs font-bold text-center ${theme.primary} text-white`}>
+                    全班加分模式：點選按鈕將為全班 {students.length} 位同學加分
+                  </div>
+                )}
 
                 <div className={`${theme.surface} p-3 lg:p-5 rounded-2xl border ${theme.border} shadow-sm`}>
                   <label className={`text-sm font-bold ${theme.primaryText} mb-4 flex items-center gap-2`}><Smile className="w-4 h-4" /> 正面表現</label>

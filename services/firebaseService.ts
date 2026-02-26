@@ -66,6 +66,26 @@ export const addPointToStudent = async (
   });
 };
 
+export const addPointToAllStudents = async (
+  userUid: string,
+  students: Student[],
+  currentDate: string,
+  behavior: { label: string; value: number }
+) => {
+  const batch = writeBatch(db);
+  for (const student of students) {
+    const studentRef = doc(db, `users/${userUid}/students/${student.id}`);
+    const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
+    const newPoint: PointLog = { id: crypto.randomUUID(), label: behavior.label, value: behavior.value, timestamp: Date.now() };
+    const updatedPoints = [...currentDayRecord.points, newPoint];
+    batch.update(studentRef, {
+      totalScore: increment(behavior.value),
+      [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note, absence: currentDayRecord.absence ?? null }
+    });
+  }
+  await batch.commit();
+};
+
 export const deletePointFromStudent = async (
   userUid: string,
   studentId: string,

@@ -76,6 +76,7 @@ export interface ClassConfig {
   boardDailyTemplates?: Partial<Record<number, string>>; // key=dayOfWeek(1=Mon…5=Fri)
   boardSituationTemplates?: BoardSituationTemplate[];    // 教師自訂情境模板
   activeBoardSituation?: string | null;                 // null=今日 day template；非空=情境id
+  showClock?: boolean;   // 時鐘顯示開關（預設 true）
   semesterStart?: string; // "YYYY-MM-DD"
   semesterEnd?: string;   // "YYYY-MM-DD"
 }

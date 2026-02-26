@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { Plus, Trash2, Save, Copy } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { updateClassConfig } from '../services/firebaseService';
 import { ClassConfig, BoardSituationTemplate } from '../types';
@@ -30,6 +30,20 @@ export const BoardTemplateEditor = ({
   const [dailyTemplates, setDailyTemplates] = useState<Partial<Record<number, string>>>(
     config.boardDailyTemplates ?? {}
   );
+  const [copySourceDay, setCopySourceDay] = useState<number | null>(null);
+  const [copyTargetDays, setCopyTargetDays] = useState<Set<number>>(new Set());
+
+  const handleCopyToTargets = () => {
+    if (copySourceDay === null) return;
+    const content = dailyTemplates[copySourceDay] ?? '';
+    const updated = { ...dailyTemplates };
+    for (const day of copyTargetDays) {
+      updated[day] = content;
+    }
+    setDailyTemplates(updated);
+    setCopySourceDay(null);
+    setCopyTargetDays(new Set());
+  };
 
   const handleDailySave = async () => {
     const newConfig: ClassConfig = { ...config, boardDailyTemplates: dailyTemplates };
@@ -108,7 +122,30 @@ export const BoardTemplateEditor = ({
           </p>
           {DAY_LABELS.map(({ key, label }) => (
             <div key={key} className="space-y-1">
-              <label className={`block text-sm font-bold ${theme.text}`}>{label}</label>
+              <div className="flex items-center justify-between">
+                <label className={`block text-sm font-bold ${theme.text}`}>{label}</label>
+                {(dailyTemplates[key] ?? '').trim() && (
+                  <button
+                    onClick={() => {
+                      if (copySourceDay === key) {
+                        setCopySourceDay(null);
+                        setCopyTargetDays(new Set());
+                      } else {
+                        setCopySourceDay(key);
+                        setCopyTargetDays(new Set());
+                      }
+                    }}
+                    className={`text-xs px-2 py-1 rounded-lg flex items-center gap-1 transition
+                      ${copySourceDay === key
+                        ? `${theme.primary} text-white`
+                        : `${theme.textLight} hover:${theme.text} hover:${theme.surfaceAlt}`
+                      }`}
+                    title="複製到其他天"
+                  >
+                    <Copy className="w-3 h-3" /> 複製到…
+                  </button>
+                )}
+              </div>
               <textarea
                 value={dailyTemplates[key] ?? ''}
                 onChange={(e) =>
@@ -118,6 +155,39 @@ export const BoardTemplateEditor = ({
                 className={`w-full p-3 ${theme.inputBg} border ${theme.border} rounded-xl text-sm ${theme.text} focus:ring-2 ${theme.focusRing} outline-none resize-none font-handwritten`}
                 placeholder={`${label}固定事項（例：升旗典禮 07:40）`}
               />
+              {copySourceDay === key && (
+                <div className={`flex flex-wrap items-center gap-2 p-2 rounded-lg ${theme.surfaceAlt}`}>
+                  <span className={`text-xs ${theme.textLight}`}>複製到：</span>
+                  {DAY_LABELS.filter(d => d.key !== key).map(d => (
+                    <label key={d.key} className={`flex items-center gap-1 text-xs cursor-pointer select-none ${theme.text}`}>
+                      <input
+                        type="checkbox"
+                        checked={copyTargetDays.has(d.key)}
+                        onChange={(e) => {
+                          setCopyTargetDays(prev => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(d.key); else next.delete(d.key);
+                            return next;
+                          });
+                        }}
+                        className="rounded"
+                      />
+                      {d.label}
+                    </label>
+                  ))}
+                  <button
+                    onClick={handleCopyToTargets}
+                    disabled={copyTargetDays.size === 0}
+                    className={`text-xs px-3 py-1 rounded-lg font-bold transition
+                      ${copyTargetDays.size > 0
+                        ? `${theme.primary} text-white hover:opacity-90`
+                        : `${theme.textLight} opacity-50 cursor-not-allowed`
+                      }`}
+                  >
+                    確認複製
+                  </button>
+                </div>
+              )}
             </div>
           ))}
           <div className="flex justify-end pt-2">

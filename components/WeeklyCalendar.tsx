@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatDate } from '../utils/date';
@@ -18,23 +18,14 @@ export const WeeklyCalendar = ({
   const theme = useTheme();
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | ''>('');
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
+  const hasInitialized = useRef(false);
 
-  const days = useMemo(() => {
-    const curr = new Date(currentDate);
-    const d = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate());
-    const day = d.getDay();
-    const diff = d.getDate() - day;
-    const startOfWeek = new Date(d);
-    startOfWeek.setDate(diff);
-
-    const week = [];
-    for (let i = 0; i < 7; i++) {
-      const nextDay = new Date(startOfWeek);
-      nextDay.setDate(startOfWeek.getDate() + i);
-      week.push(nextDay);
-    }
-    return week;
-  }, [currentDate]);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      hasInitialized.current = true;
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   const monthGrid = useMemo(() => {
     const curr = new Date(currentDate);
@@ -53,6 +44,11 @@ export const WeeklyCalendar = ({
     }
     return { cells, year, month };
   }, [currentDate]);
+
+  const currentWeekRow = useMemo(() => {
+    const idx = monthGrid.cells.findIndex(d => formatDate(d) === currentDate);
+    return idx >= 0 ? Math.floor(idx / 7) : 0;
+  }, [currentDate, monthGrid]);
 
   const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -82,13 +78,10 @@ export const WeeklyCalendar = ({
   };
 
   const handleDateClick = (d: Date) => {
-    const dStr = formatDate(d);
-    // In month view, if clicking a date outside current month, stay in month view
-    // The onDateSelect will change currentDate which recalculates monthGrid
-    onDateSelect(dStr);
+    onDateSelect(formatDate(d));
   };
 
-  const renderDayCell = (d: Date, opts: { isMonthView: boolean; isCurrentMonth?: boolean; dayIndex: number }) => {
+  const renderDayCell = (d: Date, opts: { isCurrentMonth?: boolean; dayIndex: number }) => {
     const dStr = formatDate(d);
     const isSelected = dStr === currentDate;
     const isToday = dStr === formatDate(new Date());
@@ -96,67 +89,43 @@ export const WeeklyCalendar = ({
     const hasPositive = record?.points.some(p => p.value > 0);
     const hasNegative = record?.points.some(p => p.value < 0);
     const hasNote = record?.note && record.note.trim().length > 0;
+    const absence = record?.absence;
+    const outsideMonth = opts.isCurrentMonth === false;
+    const isWeek = viewMode === 'week';
 
-    if (opts.isMonthView) {
-      const outsideMonth = opts.isCurrentMonth === false;
-      return (
-        <button
-          key={dStr}
-          onClick={() => handleDateClick(d)}
-          className={`flex flex-col items-center justify-center p-1.5 rounded-lg transition-all relative
-            ${outsideMonth ? 'opacity-30' : ''}
-            ${isSelected
-              ? `${theme.primary} text-white shadow-md`
-              : `hover:${theme.surfaceAlt} ${theme.text}`
-            }
-            ${isToday && !isSelected ? `ring-2 ring-inset ${theme.focusRing}` : ''}`}
-        >
-          <span className="text-sm font-bold leading-none">{d.getDate()}</span>
-          <div className="flex gap-0.5 mt-1 h-1">
-            {hasPositive && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : theme.accentPositive}`}></div>}
-            {hasNegative && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-[#e6bwbw]' : theme.accentNegative}`}></div>}
-          </div>
-          {hasNote && (
-            <div className="absolute top-0 right-0">
-              <div className={`w-2 h-2 rounded-full ring-1 ring-white ${isSelected ? 'bg-white/80' : 'bg-amber-400'}`}></div>
-            </div>
-          )}
-        </button>
-      );
-    }
-
-    // Week view (original)
     return (
       <button
         key={dStr}
-        onClick={() => onDateSelect(dStr)}
-        className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all relative ${isSelected
-          ? `${theme.primary} text-white shadow-md transform scale-105`
-          : `hover:${theme.surfaceAlt} ${theme.text}`
-          } ${isToday && !isSelected ? `ring-2 ring-inset ${theme.focusRing}` : ''}`}
+        onClick={() => handleDateClick(d)}
+        className={`flex flex-col items-center justify-center transition-all relative
+          ${outsideMonth ? 'opacity-30' : ''}
+          ${isSelected
+            ? `${theme.primary} text-white shadow-md${isWeek ? ' transform scale-105' : ''}`
+            : `hover:${theme.surfaceAlt} ${theme.text}`
+          }
+          ${isToday && !isSelected ? `ring-2 ring-inset ${theme.focusRing}` : ''}
+          ${isWeek ? 'p-2 rounded-xl' : 'p-1.5 rounded-lg'}`}
       >
-        <span className={`text-[10px] font-bold mb-1 opacity-70`}>{weekDays[opts.dayIndex]}</span>
-        <span className={`text-lg font-bold leading-none`}>{d.getDate()}</span>
-        <div className="flex gap-1 mt-1.5 h-1.5">
-          {hasPositive && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : theme.accentPositive}`}></div>}
-          {hasNegative && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-[#e6bwbw]' : theme.accentNegative}`}></div>}
+        <span className={`font-bold leading-none ${isWeek ? 'text-base' : 'text-sm'}`}>{d.getDate()}</span>
+        <div className={`flex items-center ${isWeek ? 'gap-1 mt-1.5 h-1.5' : 'gap-0.5 mt-1 h-1'}`}>
+          {hasPositive && <div className={`rounded-full ${isSelected ? 'bg-white' : theme.accentPositive} ${isWeek ? 'w-1.5 h-1.5' : 'w-1 h-1'}`}></div>}
+          {hasNegative && <div className={`rounded-full ${isSelected ? 'bg-[#e6bwbw]' : theme.accentNegative} ${isWeek ? 'w-1.5 h-1.5' : 'w-1 h-1'}`}></div>}
+          {absence && <span className={`font-bold leading-none ${isSelected ? 'text-white/90' : 'text-orange-500'} ${isWeek ? 'text-[9px]' : 'text-[8px]'}`}>{absence[0]}</span>}
         </div>
         {hasNote && (
-          <div className="absolute top-0.5 right-0.5">
-            <div className={`w-3 h-3 rounded-full ring-2 ring-white ${isSelected ? 'bg-white/80' : 'bg-amber-400'}`}></div>
+          <div className={`absolute ${isWeek ? 'top-0.5 right-0.5' : 'top-0 right-0'}`}>
+            <div className={`rounded-full ${isSelected ? 'bg-white/80' : 'bg-amber-400'} ${isWeek ? 'w-3 h-3 ring-2 ring-white' : 'w-2 h-2 ring-1 ring-white'}`}></div>
           </div>
         )}
       </button>
     );
   };
 
-  const headerTitle = viewMode === 'month'
-    ? `${monthGrid.year}年 ${monthGrid.month + 1}月`
-    : `${days[0].getFullYear()}年 ${days[0].getMonth() + 1}月`;
+  const headerTitle = `${monthGrid.year}年 ${monthGrid.month + 1}月`;
 
   return (
-    <div className={`${theme.surface} rounded-2xl p-4 shadow-sm border ${theme.border} ${viewMode === 'month' ? 'lg:flex-1 lg:flex lg:flex-col' : ''}`}>
-      <div className="flex items-center justify-between mb-3">
+    <div className={`${theme.surface} rounded-2xl p-4 shadow-sm border ${theme.border} flex flex-col h-full`}>
+      <div className="flex items-center justify-between mb-3 shrink-0">
         <button
           onClick={viewMode === 'month' ? handlePrevMonth : handlePrevWeek}
           className={`p-1 hover:${theme.surfaceAlt} rounded-lg ${theme.textLight}`}
@@ -182,38 +151,38 @@ export const WeeklyCalendar = ({
         </button>
       </div>
 
-      <div className={`calendar-view-transition ${viewMode === 'month' ? 'calendar-view-month lg:!max-h-none lg:flex-1 lg:flex lg:flex-col' : 'calendar-view-week'}`}>
-        {viewMode === 'week' ? (
-          <div className="overflow-x-hidden py-1">
-            <div
-              key={days[0].toISOString()}
-              className={`grid grid-cols-7 gap-2 ${slideDirection === 'left' ? 'animate-slide-in-left' : slideDirection === 'right' ? 'animate-slide-in-right' : ''}`}
-              onAnimationEnd={() => setSlideDirection('')}
-            >
-              {days.map((d, i) => renderDayCell(d, { isMonthView: false, dayIndex: i }))}
+      {/* Weekday header — always visible */}
+      <div className="grid grid-cols-7 gap-1 mb-1 shrink-0">
+        {weekDays.map(wd => (
+          <div key={wd} className={`text-center text-[10px] font-bold opacity-50 ${theme.text}`}>{wd}</div>
+        ))}
+      </div>
+
+      {/* Month grid — single 6-row grid with expand/collapse animation */}
+      <div
+        key={`${monthGrid.year}-${monthGrid.month}`}
+        className={`flex-1 overflow-hidden ${slideDirection === 'left' ? 'animate-slide-in-left' : slideDirection === 'right' ? 'animate-slide-in-right' : ''}`}
+        style={{
+          display: 'grid',
+          gridTemplateRows: [0, 1, 2, 3, 4, 5]
+            .map(i => (viewMode === 'week' && i !== currentWeekRow) ? '0fr' : '1fr')
+            .join(' '),
+          transition: hasInitialized.current ? 'grid-template-rows 400ms ease-in-out' : 'none',
+        }}
+        onAnimationEnd={() => setSlideDirection('')}
+      >
+        {[0, 1, 2, 3, 4, 5].map(rowIdx => (
+          <div key={rowIdx} style={{ overflow: 'hidden', minHeight: 0 }}>
+            <div className="grid grid-cols-7 gap-1 h-full">
+              {monthGrid.cells.slice(rowIdx * 7, rowIdx * 7 + 7).map((d, i) =>
+                renderDayCell(d, {
+                  isCurrentMonth: d.getMonth() === monthGrid.month,
+                  dayIndex: i,
+                })
+              )}
             </div>
           </div>
-        ) : (
-          <div className="overflow-x-hidden lg:flex-1 lg:flex lg:flex-col">
-            <div className="grid grid-cols-7 gap-1 mb-1 shrink-0">
-              {weekDays.map(wd => (
-                <div key={wd} className={`text-center text-[10px] font-bold opacity-50 ${theme.text}`}>{wd}</div>
-              ))}
-            </div>
-            <div
-              key={`${monthGrid.year}-${monthGrid.month}`}
-              className={`grid grid-cols-7 gap-1 lg:flex-1 ${slideDirection === 'left' ? 'animate-slide-in-left' : slideDirection === 'right' ? 'animate-slide-in-right' : ''}`}
-              style={{ gridTemplateRows: 'repeat(6, 1fr)' }}
-              onAnimationEnd={() => setSlideDirection('')}
-            >
-              {monthGrid.cells.map((d, i) => renderDayCell(d, {
-                isMonthView: true,
-                isCurrentMonth: d.getMonth() === monthGrid.month,
-                dayIndex: i % 7,
-              }))}
-            </div>
-          </div>
-        )}
+        ))}
       </div>
     </div>
   );
