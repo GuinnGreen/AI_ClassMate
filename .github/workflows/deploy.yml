@@ -3,6 +3,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [ main ]
+  repository_dispatch:
+    types: [guide-updated]
   workflow_dispatch:
 
 permissions:
@@ -18,8 +20,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout main app
         uses: actions/checkout@v4
+
+      - name: Checkout guide site
+        uses: actions/checkout@v4
+        with:
+          repository: GuinnGreen/AI_ClassMate_guide
+          path: _guide_repo
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -27,14 +35,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install main app dependencies
         run: npm ci
 
-      - name: Build
+      - name: Build main app
         run: npm run build
         env:
-          # 若有需要，也可在此設定 CI 用變數，但通常機密會在 GitHub Secrets
-          # 這裡假設 build 過後只需要 static files，不需要 runtime env
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
@@ -44,6 +50,19 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+
+      - name: Install guide dependencies
+        working-directory: _guide_repo/guide
+        run: npm ci
+
+      - name: Build guide
+        working-directory: _guide_repo/guide
+        run: npm run build
+
+      - name: Merge build outputs
+        run: |
+          mkdir -p dist/guide
+          cp -r _guide_repo/guide/dist/* dist/guide/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
