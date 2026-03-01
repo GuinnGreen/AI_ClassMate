@@ -77,6 +77,7 @@ export interface ClassConfig {
   boardSituationTemplates?: BoardSituationTemplate[];    // 教師自訂情境模板
   activeBoardSituation?: string | null;                 // null=今日 day template；非空=情境id
   showClock?: boolean;   // 時鐘顯示開關（預設 true）
+  zhuyinMode?: boolean;  // 注音字型開關（預設 false）
   semesterStart?: string; // "YYYY-MM-DD"
   semesterEnd?: string;   // "YYYY-MM-DD"
 }

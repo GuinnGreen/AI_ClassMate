@@ -146,7 +146,10 @@ export const WhiteboardWorkspace = ({
     ? { writingMode, textOrientation: 'upright' as const }
     : { writingMode };
 
-  const noLinesStyle = !showBoardLines ? { lineHeight: effectiveLineHeight } : {};
+  const zhuyinMultiplier = (config.zhuyinMode ?? false) ? 1.5 : 1;
+  const noLinesStyle = !showBoardLines
+    ? { lineHeight: `calc(${effectiveLineHeight} * ${zhuyinMultiplier})` }
+    : {};
 
   useEffect(() => {
     setBoardContent(config.class_board || '');

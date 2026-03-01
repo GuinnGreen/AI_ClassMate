@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Users, LogOut, School, Edit3, Moon, Sun,
-  Plus, Minus, Type, Sunset, BarChart2, Calendar, PanelLeftClose
+  Plus, Minus, Type, Sunset, BarChart2, Calendar, PanelLeftClose, Languages
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { useTheme } from '../contexts/ThemeContext';
@@ -30,6 +30,8 @@ export const Sidebar = ({
   user,
   isSidebarCollapsed,
   onToggleSidebarCollapse,
+  zhuyinMode,
+  onZhuyinToggle,
 }: {
   students: Student[];
   selectedStudentId: string | null;
@@ -49,6 +51,8 @@ export const Sidebar = ({
   user: User;
   isSidebarCollapsed: boolean;
   onToggleSidebarCollapse: () => void;
+  zhuyinMode: boolean;
+  onZhuyinToggle: () => void;
 }) => {
   const theme = useTheme();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -232,6 +236,13 @@ export const Sidebar = ({
                 title="學期設定"
               >
                 <Calendar className="w-5 h-5" />
+              </button>
+              <button
+                onClick={onZhuyinToggle}
+                className={`p-2 rounded-lg hover:${theme.surface} transition ${zhuyinMode ? theme.text : theme.textLight} hover:${theme.text}`}
+                title="注音字型開關"
+              >
+                <Languages className="w-5 h-5" />
               </button>
             </div>
             <div className={`flex items-center gap-1 ${theme.surface} rounded-lg border ${theme.border} p-1`}>

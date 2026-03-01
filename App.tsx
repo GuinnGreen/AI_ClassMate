@@ -190,14 +190,14 @@ export default function App() {
     }
   };
 
-  if (!user && !loading) return <ErrorBoundary><FontStyles /><Login /></ErrorBoundary>;
+  if (!user && !loading) return <ErrorBoundary><FontStyles zhuyinMode={false} /><Login /></ErrorBoundary>;
   if (loading) return <div className={`h-dvh flex items-center justify-center ${theme.bg} ${theme.text}`}>載入資料中...</div>;
 
   return (
     <ErrorBoundary>
       <ThemeProvider value={theme}>
-        <div className={`flex h-dvh w-full ${theme.bg} font-sans ${getFontSizeClass()} transition-colors duration-300`}>
-          <FontStyles />
+        <div className={`flex h-dvh w-full ${theme.bg} font-sans ${getFontSizeClass()} transition-colors duration-300 ${classConfig.zhuyinMode ? 'zhuyin-active' : ''}`}>
+          <FontStyles zhuyinMode={classConfig.zhuyinMode ?? false} />
           {isSidebarCollapsed && (
             <button
               onClick={() => setIsSidebarCollapsed(false)}
@@ -229,6 +229,13 @@ export default function App() {
             user={user!}
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebarCollapse={() => setIsSidebarCollapsed(prev => !prev)}
+            zhuyinMode={classConfig.zhuyinMode ?? false}
+            onZhuyinToggle={async () => {
+              if (!user) return;
+              const newConfig = { ...classConfig, zhuyinMode: !classConfig.zhuyinMode };
+              setClassConfig(newConfig);
+              await updateClassConfig(user.uid, newConfig);
+            }}
           />
           <div className={`flex-1 flex flex-col h-full overflow-hidden p-3 lg:p-4 relative transition-[margin] duration-300 ease-in-out ${isSidebarCollapsed ? 'lg:ml-0' : 'lg:ml-72'}`}>
             <div className={`flex-1 overflow-hidden rounded-3xl shadow-sm border ${theme.border} ${theme.surface} relative`}>
