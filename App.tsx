@@ -4,10 +4,12 @@ import { Users, Upload, PanelLeftOpen } from 'lucide-react';
 import { auth } from './firebase';
 import { LIGHT_THEME, DARK_THEME } from './constants/theme';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { Student, ClassConfig } from './types';
+import { Student, ClassConfig, Announcement } from './types';
 import {
   subscribeToStudents,
   subscribeToConfig,
+  subscribeToAnnouncements,
+  subscribeToReadAnnouncements,
   updateStudentName,
   updateStudentSeatNumber,
   importStudents,
@@ -34,6 +36,8 @@ export default function App() {
   const [fontSizeLevel, setFontSizeLevel] = useState(1);
   const [clockSizeLevel, setClockSizeLevel] = useState(1);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar-desktop-collapsed') === 'true'; }
     catch { return false; }
@@ -72,7 +76,9 @@ export default function App() {
       setLoading(false);
     });
     const unsubConfig = subscribeToConfig(user.uid, setClassConfig);
-    return () => { unsubStudents(); unsubConfig(); };
+    const unsubAnnouncements = subscribeToAnnouncements(setAnnouncements);
+    const unsubReadAnnouncements = subscribeToReadAnnouncements(user.uid, setReadAnnouncementIds);
+    return () => { unsubStudents(); unsubConfig(); unsubAnnouncements(); unsubReadAnnouncements(); };
   }, [user?.uid]);
 
   // Nap time auto-dark: keep ref in sync
@@ -230,6 +236,8 @@ export default function App() {
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebarCollapse={() => setIsSidebarCollapsed(prev => !prev)}
             zhuyinMode={classConfig.zhuyinMode ?? false}
+            announcements={announcements}
+            readAnnouncementIds={readAnnouncementIds}
             onZhuyinToggle={async () => {
               if (!user) return;
               const newConfig = { ...classConfig, zhuyinMode: !classConfig.zhuyinMode };

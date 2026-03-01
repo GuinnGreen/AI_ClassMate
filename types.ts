@@ -103,6 +103,18 @@ export interface EvaluationCategory {
   negative: string[];
 }
 
+// --- 公告系統 ---
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  type: 'update' | 'survey';
+  surveyUrl?: string;
+  showPairingCode?: boolean;
+  createdAt: number;
+  active: boolean;
+}
+
 export const EVALUATION_CATEGORIES: EvaluationCategory[] = [
   {
     title: '學習態度與責任',

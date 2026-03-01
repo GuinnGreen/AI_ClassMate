@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import {
   Users, LogOut, School, Edit3, Moon, Sun,
-  Plus, Minus, Type, Sunset, BarChart2, Calendar, PanelLeftClose, Languages
+  Plus, Minus, Type, Sunset, BarChart2, Calendar, PanelLeftClose, Languages, Bell
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { useTheme } from '../contexts/ThemeContext';
 import { Modal } from './ui/Modal';
-import { Student, ClassConfig } from '../types';
+import { Student, ClassConfig, Announcement } from '../types';
 import { formatDate } from '../utils/date';
 import { updateClassConfig, archiveSemester } from '../services/firebaseService';
 import { AbsenceStatsModal } from './AbsenceStatsModal';
+import { NotificationPanel } from './NotificationPanel';
 
 export const Sidebar = ({
   students,
@@ -32,6 +33,8 @@ export const Sidebar = ({
   onToggleSidebarCollapse,
   zhuyinMode,
   onZhuyinToggle,
+  announcements,
+  readAnnouncementIds,
 }: {
   students: Student[];
   selectedStudentId: string | null;
@@ -53,6 +56,8 @@ export const Sidebar = ({
   onToggleSidebarCollapse: () => void;
   zhuyinMode: boolean;
   onZhuyinToggle: () => void;
+  announcements: Announcement[];
+  readAnnouncementIds: string[];
 }) => {
   const theme = useTheme();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -67,6 +72,9 @@ export const Sidebar = ({
   const [archivePassword, setArchivePassword] = useState('');
   const [archiveError, setArchiveError] = useState('');
   const [archiving, setArchiving] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const unreadCount = announcements.filter(a => !readAnnouncementIds.includes(a.id)).length;
 
   useEffect(() => {
     setNapStart(napTimeStart || '');
@@ -110,13 +118,25 @@ export const Sidebar = ({
               </div>
               <h1 className={`font-bold text-xl ${theme.text} tracking-tight`}>主畫面</h1>
             </div>
-            <button
-              onClick={onToggleSidebarCollapse}
-              className={`hidden lg:flex p-2 rounded-lg hover:${theme.surface} ${theme.textLight} hover:${theme.text} transition`}
-              title="收合側邊欄"
-            >
-              <PanelLeftClose className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowNotifications(true)}
+                className={`relative p-2 rounded-lg hover:${theme.surface} ${theme.textLight} hover:${theme.text} transition`}
+                title="系統通知"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-800" />
+                )}
+              </button>
+              <button
+                onClick={onToggleSidebarCollapse}
+                className={`hidden lg:flex p-2 rounded-lg hover:${theme.surface} ${theme.textLight} hover:${theme.text} transition`}
+                title="收合側邊欄"
+              >
+                <PanelLeftClose className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -383,6 +403,14 @@ export const Sidebar = ({
           </div>
         </div>
       </Modal>
+
+      <NotificationPanel
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        announcements={announcements}
+        readIds={readAnnouncementIds}
+        userUid={userUid}
+      />
 
       <Modal
         isOpen={showNapSettings}

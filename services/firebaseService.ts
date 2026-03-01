@@ -12,10 +12,11 @@ import {
   getDocs,
   query,
   where,
+  getDoc,
 } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential, User } from 'firebase/auth';
 import { db } from '../firebase';
-import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule, DailyRecord, AbsenceType } from '../types';
+import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule, DailyRecord, AbsenceType, Announcement } from '../types';
 
 // --- Student CRUD ---
 
@@ -312,4 +313,46 @@ export const archiveSemester = async (user: User, password: string) => {
     batch.update(d.ref, { totalScore: 0, dailyRecords: {} });
   });
   await batch.commit();
+};
+
+// --- Announcements ---
+
+export const subscribeToAnnouncements = (
+  callback: (announcements: Announcement[]) => void
+) => {
+  const announcementsRef = collection(db, 'announcements');
+  const q = query(announcementsRef, where('active', '==', true));
+  return onSnapshot(q, (snapshot) => {
+    const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Announcement[];
+    list.sort((a, b) => b.createdAt - a.createdAt);
+    callback(list);
+  });
+};
+
+export const getReadAnnouncementIds = async (userUid: string): Promise<string[]> => {
+  const ref = doc(db, `users/${userUid}/settings/readAnnouncements`);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return [];
+  const data = snap.data();
+  return Object.keys(data).filter(k => data[k] === true);
+};
+
+export const subscribeToReadAnnouncements = (
+  userUid: string,
+  callback: (ids: string[]) => void
+) => {
+  const ref = doc(db, `users/${userUid}/settings/readAnnouncements`);
+  return onSnapshot(ref, (snap) => {
+    if (!snap.exists()) {
+      callback([]);
+      return;
+    }
+    const data = snap.data();
+    callback(Object.keys(data).filter(k => data[k] === true));
+  });
+};
+
+export const markAnnouncementAsRead = async (userUid: string, announcementId: string) => {
+  const ref = doc(db, `users/${userUid}/settings/readAnnouncements`);
+  await setDoc(ref, { [announcementId]: true }, { merge: true });
 };
