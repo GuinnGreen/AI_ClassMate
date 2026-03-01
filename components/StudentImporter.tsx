@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react';
-import { FileText, Upload } from 'lucide-react';
+import { FileText, Upload, Calendar } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
 export const StudentImporter = ({
   onImport,
+  semesterStart,
+  semesterEnd,
+  onSemesterChange,
 }: {
   onImport: (names: string[]) => void;
+  semesterStart: string;
+  semesterEnd: string;
+  onSemesterChange: (start: string, end: string) => void;
 }) => {
   const theme = useTheme();
   const [text, setText] = useState('');
@@ -39,6 +45,32 @@ export const StudentImporter = ({
             <li>支援 Excel 直接複製貼上</li>
           </ul>
         </p>
+      </div>
+
+      <div className={`p-4 rounded-xl ${theme.surfaceAccent} border ${theme.border}`}>
+        <h3 className={`font-bold ${theme.text} mb-3 flex items-center gap-2`}>
+          <Calendar className="w-5 h-5" /> 學期期間設定
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={`text-sm font-bold ${theme.text} block mb-1`}>學期開始</label>
+            <input
+              type="date"
+              value={semesterStart}
+              onChange={e => onSemesterChange(e.target.value, semesterEnd)}
+              className={`w-full p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} focus:ring-2 ${theme.focusRing} outline-none`}
+            />
+          </div>
+          <div>
+            <label className={`text-sm font-bold ${theme.text} block mb-1`}>學期結束</label>
+            <input
+              type="date"
+              value={semesterEnd}
+              onChange={e => onSemesterChange(semesterStart, e.target.value)}
+              className={`w-full p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} focus:ring-2 ${theme.focusRing} outline-none`}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

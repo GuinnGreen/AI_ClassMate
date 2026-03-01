@@ -169,8 +169,15 @@ export default function App() {
   const handleImportStudents = async (names: string[]) => {
     if (!user) return;
     await importStudents(user.uid, names, students.length);
-    setActiveManagerTab('list');
+    setIsStudentManagerOpen(false);
     alert(`成功匯入 ${names.length} 位學生！`);
+  };
+
+  const handleSemesterChange = async (start: string, end: string) => {
+    if (!user) return;
+    const newConfig = { ...classConfig, semesterStart: start, semesterEnd: end };
+    setClassConfig(newConfig);
+    await updateClassConfig(user.uid, newConfig);
   };
 
   const getFontSizeClass = () => {
@@ -300,7 +307,12 @@ export default function App() {
                 onUpdateSeatNumber={handleUpdateStudentSeatNumber}
               />
             ) : (
-              <StudentImporter onImport={handleImportStudents} />
+              <StudentImporter
+                onImport={handleImportStudents}
+                semesterStart={classConfig.semesterStart || ''}
+                semesterEnd={classConfig.semesterEnd || ''}
+                onSemesterChange={handleSemesterChange}
+              />
             )}
           </Modal>
 
