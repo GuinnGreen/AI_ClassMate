@@ -28,6 +28,7 @@ import { StudentManager } from './components/StudentManager';
 import { StudentImporter } from './components/StudentImporter';
 import { StudentDetailWorkspace } from './components/StudentDetailWorkspace';
 import { WhiteboardWorkspace } from './components/WhiteboardWorkspace';
+import { TeacherToolbar } from './components/TeacherToolbar';
 
 export default function App() {
   const { updateAvailable } = useAppUpdate();
@@ -291,6 +292,8 @@ export default function App() {
               )}
             </div>
           </div>
+
+          <TeacherToolbar students={students} />
 
           {/* Student Manager Modal */}
           <Modal

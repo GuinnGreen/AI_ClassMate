@@ -57,3 +57,21 @@
   transform: scale(0.92);
   transition: transform 0.1s;
 }
+
+/* Picker spinning text effect */
+.picker-spin-text {
+  animation: picker-flash 80ms ease-in-out;
+}
+@keyframes picker-flash {
+  0% { opacity: 0.4; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Countdown pulse for critical time (≤10s) */
+.countdown-pulse {
+  animation: countdown-pulse 1s ease-in-out infinite;
+}
+@keyframes countdown-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+}
