@@ -39,11 +39,14 @@ jobs:
 
       - name: Write version file
         run: |
-          echo "{\"buildTime\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/version.json
+          BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "{\"buildTime\":\"$BUILD_TIME\"}" > public/version.json
+          echo "BUILD_TIME=$BUILD_TIME" >> $GITHUB_ENV
 
       - name: Build main app
         run: npm run build
         env:
+          VITE_APP_BUILD_TIME: ${{ env.BUILD_TIME }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
