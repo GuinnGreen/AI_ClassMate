@@ -16,6 +16,8 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
+declare const __APP_BUILD_TIME__: string;
+
 // Augment existing NodeJS namespace to include API_KEY in ProcessEnv
 declare global {
   namespace NodeJS {

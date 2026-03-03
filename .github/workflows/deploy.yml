@@ -37,6 +37,10 @@ jobs:
       - name: Install main app dependencies
         run: npm ci
 
+      - name: Write version file
+        run: |
+          echo "{\"buildTime\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/version.json
+
       - name: Build main app
         run: npm run build
         env:

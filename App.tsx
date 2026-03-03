@@ -17,6 +17,8 @@ import {
   updateClassConfig,
 } from './services/firebaseService';
 
+import { useAppUpdate } from './hooks/useAppUpdate';
+import { UpdateBanner } from './components/UpdateBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FontStyles } from './components/FontStyles';
 import { Login } from './components/Login';
@@ -28,6 +30,7 @@ import { StudentDetailWorkspace } from './components/StudentDetailWorkspace';
 import { WhiteboardWorkspace } from './components/WhiteboardWorkspace';
 
 export default function App() {
+  const { updateAvailable } = useAppUpdate();
   const [user, setUser] = useState<User | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [classConfig, setClassConfig] = useState<ClassConfig>({ class_board: '' });
@@ -201,6 +204,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      {updateAvailable && <UpdateBanner />}
       <ThemeProvider value={theme}>
         <div className={`flex h-dvh w-full ${theme.bg} font-sans ${getFontSizeClass()} transition-colors duration-300 ${classConfig.zhuyinMode ? 'zhuyin-active' : ''}`}>
           <FontStyles zhuyinMode={classConfig.zhuyinMode ?? false} />
