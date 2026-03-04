@@ -111,6 +111,7 @@ export interface Announcement {
   type: 'update' | 'survey';
   surveyUrl?: string;
   showPairingCode?: boolean;
+  pairingCodeParam?: string;  // Google Form 欄位 ID，例如 "entry.123456789"
   createdAt: number;
   active: boolean;
 }

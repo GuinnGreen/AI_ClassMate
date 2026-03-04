@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   ChevronLeft, Sparkles, Save, Trash2, ClipboardList,
   Smile, Frown, School, Clock, Settings, Copy, AlignLeft,
-  Check, Lock, Download, BookX, Users
+  Check, Lock, Download, BookX, Users, HelpCircle
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatDate } from '../utils/date';
@@ -503,6 +503,15 @@ export const StudentDetailWorkspace = ({
               <button onClick={() => setMode('daily')} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'daily' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><ClipboardList className="w-4 h-4 lg:hidden" /><span className="hidden lg:inline">日常紀錄</span></button>
               <button onClick={() => setMode('ai')} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><Sparkles className="w-4 h-4" /><span className="hidden lg:inline">AI 評語</span></button>
             </div>
+            <a
+              href="https://ai-classmate.com/guide/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="操作教學"
+              className={`p-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} transition`}
+            >
+              <HelpCircle className="w-5 h-5" />
+            </a>
             <button
               onClick={() => { setPendingAction('export'); setShowPasswordModal(true); }}
               className={`p-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} transition`}

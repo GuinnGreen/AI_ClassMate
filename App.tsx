@@ -271,6 +271,17 @@ export default function App() {
                   >
                     <Upload className="w-6 h-6" /> 立即匯入學生名單
                   </button>
+                  <p className="mt-3 text-sm text-gray-400 dark:text-gray-500">
+                    不確定怎麼開始？{' '}
+                    <a
+                      href="https://ai-classmate.com/guide/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      查看操作教學 →
+                    </a>
+                  </p>
                 </div>
               ) : selectedStudentId ? (
                 <StudentDetailWorkspace

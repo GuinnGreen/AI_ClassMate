@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { ClipboardList, Clock, Settings, Calendar as CalendarIcon, Minus, Plus, LayoutTemplate, Eye, EyeOff } from 'lucide-react';
+import { ClipboardList, Clock, Settings, Calendar as CalendarIcon, Minus, Plus, LayoutTemplate, Eye, EyeOff, HelpCircle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { getCurrentTime } from '../utils/date';
 import { isCurrentPeriod, getPeriodParts } from '../utils/schedule';
@@ -217,9 +217,20 @@ export const WhiteboardWorkspace = ({
             <Clock className={`${cs.clockIcon} ${theme.textLight} shrink-0`} />
             <h1 className={`${theme.text} ${cs.time} font-extrabold tracking-tight tabular-nums leading-none`}>{currentTime.time}</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <CalendarIcon className={`${cs.calIcon} ${theme.textLight} shrink-0`} />
-            <p className={`${theme.text} ${cs.date} font-semibold tracking-wide`}>{currentTime.date}</p>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className={`${cs.calIcon} ${theme.textLight} shrink-0`} />
+              <p className={`${theme.text} ${cs.date} font-semibold tracking-wide`}>{currentTime.date}</p>
+            </div>
+            <a
+              href="https://ai-classmate.com/guide/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} transition text-sm font-bold shrink-0`}
+            >
+              <HelpCircle className="w-4 h-4" />
+              操作教學
+            </a>
           </div>
         </div>
       ) : (

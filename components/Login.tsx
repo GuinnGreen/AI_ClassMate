@@ -210,6 +210,17 @@ export const Login = () => {
             </div>
           )}
         </form>
+        <p className={`text-center text-sm ${theme.textLight}`}>
+          第一次使用？{' '}
+          <a
+            href="https://ai-classmate.com/guide/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:opacity-70"
+          >
+            查看操作教學 →
+          </a>
+        </p>
       </div>
     </div>
   );

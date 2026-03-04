@@ -32,6 +32,12 @@ export const NotificationPanel = ({
 
   const pairingCode = userUid.slice(-6).toUpperCase();
 
+  const buildSurveyUrl = (baseUrl: string, paramName?: string): string => {
+    if (!paramName) return baseUrl;
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    return `${baseUrl}${separator}${paramName}=${encodeURIComponent(pairingCode)}`;
+  };
+
   const formatTime = (ts: number) => {
     const d = new Date(ts);
     return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
@@ -85,7 +91,7 @@ export const NotificationPanel = ({
                     )}
                     {a.surveyUrl && (
                       <a
-                        href={a.surveyUrl}
+                        href={buildSurveyUrl(a.surveyUrl, a.pairingCodeParam)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm transition"
