@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { Student, DaySchedule } from "../types";
 
 // --- Multi-Key Rotation Logic ---
@@ -168,7 +168,8 @@ async function callOpenAICompatibleVision(
           ],
         },
       ],
-      temperature: 0.2,
+      temperature: 0.1,
+      response_format: { type: "json_object" },
     }),
   });
 
@@ -332,6 +333,22 @@ export const parseScheduleFromImage = async (
 - 第六節（對應 14:20-15:00）
 - 第七節（對應 15:20-16:00）
 
+【雙語課表處理規則】
+- 部分課表每格包含中文和英文（如「數學 Math」「體育 P.E.」），這是雙語標注，不是兩節課
+- 遇到中英並列的格子，只取中文科目名稱，完全忽略英文部分
+- 英文教師姓名（如「Wang」「Chen」）視同一般教師姓名，一律忽略
+- 格子內的換行符或斜線（/）不代表分隔兩節課，整格仍算一節
+
+【星期欄位辨識規則】
+- 欄標題可能的格式：「一二三四五」、「星期一 星期二...」、「Mon Tue...」，皆對應 dayOfWeek 1-5
+- 有些課表欄位順序是**從右到左**（五四三二一），請依照欄位實際位置對應正確的 dayOfWeek，不要假設一定是從左到右
+- 若無法辨識欄標題，預設以從左到右為週一到週五
+
+【早自習處理規則】
+- 部分課表在第一節前有「早自習」、「早讀」、「晨間」等行，這不屬於七節課的範圍
+- 請完全忽略早自習列，七節課從第一節（08:40）開始計算
+- 若課表標示節次號碼，請以第 1 節 = 第一節、第 2 節 = 第二節……以此類推，不要將早自習算作第一節
+
 【輸出格式】
 直接輸出純 JSON 陣列，不加任何 Markdown 標記：
 [
@@ -359,16 +376,89 @@ export const parseScheduleFromImage = async (
 - periodName 只能使用「第一節」到「第七節」
   `;
 
-  // 共用 JSON 解析 helper
-  function parseJsonResponse(text: string): DaySchedule[] {
-    const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    try {
-      return JSON.parse(jsonStr) as DaySchedule[];
-    } catch {
-      console.error("Failed to parse JSON from AI response:", jsonStr);
-      throw new Error("AI 回傳的格式無法解析，請重試或手動輸入。");
+  const PERIOD_NAMES = ["第一節","第二節","第三節","第四節","第五節","第六節","第七節"] as const;
+
+  function validateAndRepairSchedule(raw: unknown[]): DaySchedule[] {
+    const dayMap = new Map<number, DaySchedule>();
+
+    for (const item of raw) {
+      if (typeof item !== 'object' || item === null) continue;
+      const obj = item as Record<string, unknown>;
+      const dayOfWeek = Number(obj.dayOfWeek);
+      if (!Number.isInteger(dayOfWeek) || dayOfWeek < 1 || dayOfWeek > 5) continue;
+
+      const rawPeriods = Array.isArray(obj.periods) ? obj.periods : [];
+      const periods = PERIOD_NAMES.map((periodName, idx) => {
+        const p = rawPeriods[idx] as Record<string, unknown> | undefined;
+        const subject = typeof p?.subject === 'string' ? p.subject.trim() : "";
+        return { periodName, subject };
+      });
+
+      dayMap.set(dayOfWeek, { dayOfWeek, periods });
     }
+
+    for (let day = 1; day <= 5; day++) {
+      if (!dayMap.has(day)) {
+        dayMap.set(day, {
+          dayOfWeek: day,
+          periods: PERIOD_NAMES.map(periodName => ({ periodName, subject: "" })),
+        });
+      }
+    }
+
+    return [1,2,3,4,5].map(day => dayMap.get(day)!);
   }
+
+  function extractAndParseJson(text: string): DaySchedule[] {
+    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+
+    try {
+      const parsed = JSON.parse(cleaned);
+      if (Array.isArray(parsed)) return validateAndRepairSchedule(parsed);
+    } catch { /* 繼續 */ }
+
+    const start = cleaned.indexOf('[');
+    const end = cleaned.lastIndexOf(']');
+    if (start !== -1 && end > start) {
+      try {
+        const parsed = JSON.parse(cleaned.substring(start, end + 1));
+        if (Array.isArray(parsed)) return validateAndRepairSchedule(parsed);
+      } catch { /* 繼續 */ }
+    }
+
+    console.error("[課表辨識] 無法提取 JSON:", cleaned.substring(0, 300));
+    throw new Error("AI 回傳的格式無法解析，請重試或手動輸入。");
+  }
+
+  const SCHEDULE_RESPONSE_SCHEMA = {
+    type: Type.ARRAY,
+    minItems: "5",
+    maxItems: "5",
+    items: {
+      type: Type.OBJECT,
+      required: ["dayOfWeek", "periods"],
+      properties: {
+        dayOfWeek: { type: Type.INTEGER },
+        periods: {
+          type: Type.ARRAY,
+          minItems: "7",
+          maxItems: "7",
+          items: {
+            type: Type.OBJECT,
+            required: ["periodName", "subject"],
+            properties: {
+              periodName: {
+                type: Type.STRING,
+                enum: ["第一節","第二節","第三節","第四節","第五節","第六節","第七節"],
+              },
+              subject: { type: Type.STRING },
+            },
+          },
+        },
+      },
+    },
+  };
 
   const VISION_SUPPORTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
   const errors: string[] = [];
@@ -384,9 +474,14 @@ export const parseScheduleFromImage = async (
               { inlineData: { mimeType, data: base64Data } },
               { text: prompt }
             ]
+          },
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: SCHEDULE_RESPONSE_SCHEMA,
+            temperature: 0.1,
           }
         });
-        return parseJsonResponse(response.text || "[]");
+        return extractAndParseJson(response.text || "[]");
       });
       return daySchedules;
     } catch (error: unknown) {
@@ -409,7 +504,7 @@ export const parseScheduleFromImage = async (
         base64Data,
         mimeType
       );
-      return parseJsonResponse(text);
+      return extractAndParseJson(text);
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
       console.warn("[課表辨識] Groq Vision 失敗:", detail);
@@ -433,7 +528,7 @@ export const parseScheduleFromImage = async (
         base64Data,
         mimeType
       );
-      return parseJsonResponse(text);
+      return extractAndParseJson(text);
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
       console.warn("[課表辨識] OpenRouter 失敗:", detail);
