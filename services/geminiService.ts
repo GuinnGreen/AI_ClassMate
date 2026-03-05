@@ -220,7 +220,9 @@ export const generateStudentComment = async (
         historyText += `\n[日期: ${date}]`;
         if (record.points.length > 0) {
           const positives = record.points.filter(p => p.value > 0).map(p => p.label).join(", ");
-          const negatives = record.points.filter(p => p.value < 0).map(p => p.label).join(", ");
+          const negatives = record.points
+            .filter(p => p.value < 0 && !p.label.startsWith('🎁'))
+            .map(p => p.label).join(", ");
           if (positives) historyText += `\n  - 優點表現: ${positives}`;
           if (negatives) historyText += `\n  - 待改進: ${negatives}`;
         }

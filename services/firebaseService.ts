@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential, User } from 'firebase/auth';
 import { db } from '../firebase';
-import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule, DailyRecord, AbsenceType, Announcement } from '../types';
+import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule, DailyRecord, AbsenceType, Announcement, PrizeItem } from '../types';
 
 // --- Student CRUD ---
 
@@ -175,6 +175,11 @@ export const updateStudentSeatNumber = async (userUid: string, studentId: string
   await updateDoc(ref, { seatNumber });
 };
 
+export const setStudentScore = async (userUid: string, studentId: string, newScore: number) => {
+  const ref = doc(db, `users/${userUid}/students/${studentId}`);
+  await updateDoc(ref, { totalScore: newScore });
+};
+
 export const importStudents = async (userUid: string, names: string[], existingCount: number) => {
   const batch = writeBatch(db);
   names.forEach((name, idx) => {
@@ -231,6 +236,17 @@ export const updateCustomBehaviors = async (
     negative: type === 'negative' ? newBtns : negativeBehaviors
   };
   const newConfig = { ...currentConfig, customBehaviors: updatedBehaviors };
+  const ref = doc(db, `users/${userUid}/settings/config`);
+  await setDoc(ref, newConfig, { merge: true });
+  return newConfig;
+};
+
+export const updatePrizes = async (
+  userUid: string,
+  currentConfig: ClassConfig,
+  newPrizes: PrizeItem[]
+) => {
+  const newConfig = { ...currentConfig, prizes: newPrizes };
   const ref = doc(db, `users/${userUid}/settings/config`);
   await setDoc(ref, newConfig, { merge: true });
   return newConfig;

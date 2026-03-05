@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckSquare, Square, Trash2, Edit3, Check, Hash } from 'lucide-react';
+import { CheckSquare, Square, Trash2, Edit3, Check, Hash, Star } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Student } from '../types';
 
@@ -9,12 +9,14 @@ export const StudentManager = ({
   onDelete,
   onUpdateName,
   onUpdateSeatNumber,
+  onUpdateScore,
 }: {
   students: Student[];
   onClose: () => void;
   onDelete: (ids: string[]) => void;
   onUpdateName: (id: string, newName: string) => void;
   onUpdateSeatNumber: (id: string, seatNumber: number) => void;
+  onUpdateScore: (id: string, newScore: number) => void;
 }) => {
   const theme = useTheme();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -22,9 +24,11 @@ export const StudentManager = ({
   const [editName, setEditName] = useState('');
   const [editingSeatId, setEditingSeatId] = useState<string | null>(null);
   const [editSeatNum, setEditSeatNum] = useState('');
+  const [editingScoreId, setEditingScoreId] = useState<string | null>(null);
+  const [editScoreVal, setEditScoreVal] = useState('');
 
   const toggleSelect = (id: string) => {
-    if (editingId || editingSeatId) return;
+    if (editingId || editingSeatId || editingScoreId) return;
     const newSet = new Set(selectedIds);
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
@@ -34,6 +38,7 @@ export const StudentManager = ({
   const startEdit = (e: React.MouseEvent, student: Student) => {
     e.stopPropagation();
     setEditingSeatId(null);
+    setEditingScoreId(null);
     setEditingId(student.id);
     setEditName(student.name);
   };
@@ -48,6 +53,7 @@ export const StudentManager = ({
   const startSeatEdit = (e: React.MouseEvent, student: Student) => {
     e.stopPropagation();
     setEditingId(null);
+    setEditingScoreId(null);
     setEditingSeatId(student.id);
     setEditSeatNum(String(student.seatNumber ?? student.order ?? ''));
   };
@@ -58,6 +64,22 @@ export const StudentManager = ({
       onUpdateSeatNumber(id, num);
     }
     setEditingSeatId(null);
+  };
+
+  const startScoreEdit = (e: React.MouseEvent, student: Student) => {
+    e.stopPropagation();
+    setEditingId(null);
+    setEditingSeatId(null);
+    setEditingScoreId(student.id);
+    setEditScoreVal(String(student.totalScore));
+  };
+
+  const saveScoreEdit = (id: string) => {
+    const num = parseInt(editScoreVal, 10);
+    if (!isNaN(num)) {
+      onUpdateScore(id, num);
+    }
+    setEditingScoreId(null);
   };
 
   const handleSelectAll = () => {
@@ -129,10 +151,19 @@ export const StudentManager = ({
               )}
             </div>
 
-            {!editingId && !editingSeatId && (
+            {!editingId && !editingSeatId && !editingScoreId && (
               <div className="flex items-center gap-1">
                 {selectedIds.has(student.id) ? <Check className="w-5 h-5" /> : (
                   <>
+                    {/* 積分顯示 + 編輯 */}
+                    <span className={`text-sm font-bold ${theme.textLight} mr-1`}>{student.totalScore > 0 ? '+' : ''}{student.totalScore}</span>
+                    <button
+                      onClick={(e) => startScoreEdit(e, student)}
+                      className={`p-2 rounded-full hover:bg-black/10 transition ${theme.textLight} hover:${theme.text}`}
+                      title="設定積分"
+                    >
+                      <Star className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={(e) => startSeatEdit(e, student)}
                       className={`p-2 rounded-full hover:bg-black/10 transition ${theme.textLight} hover:${theme.text}`}
@@ -149,6 +180,19 @@ export const StudentManager = ({
                     </button>
                   </>
                 )}
+              </div>
+            )}
+            {editingScoreId === student.id && (
+              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                <input
+                  type="number"
+                  value={editScoreVal}
+                  onChange={e => setEditScoreVal(e.target.value)}
+                  className="w-20 p-1 px-2 rounded bg-white text-black text-sm outline-none border-2 border-yellow-400 text-center"
+                  autoFocus
+                  onKeyDown={e => { if (e.key === 'Enter') saveScoreEdit(student.id); if (e.key === 'Escape') setEditingScoreId(null); }}
+                />
+                <button onClick={() => saveScoreEdit(student.id)} className="p-1.5 bg-green-500 text-white rounded hover:bg-green-600"><Check className="w-4 h-4" /></button>
               </div>
             )}
           </div>

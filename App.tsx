@@ -12,6 +12,7 @@ import {
   subscribeToReadAnnouncements,
   updateStudentName,
   updateStudentSeatNumber,
+  setStudentScore,
   importStudents,
   deleteStudents,
   updateClassConfig,
@@ -176,6 +177,11 @@ export default function App() {
     await updateStudentSeatNumber(user.uid, id, seatNumber);
   };
 
+  const handleUpdateStudentScore = async (id: string, newScore: number) => {
+    if (!user) return;
+    await setStudentScore(user.uid, id, newScore);
+  };
+
   const handleImportStudents = async (names: string[]) => {
     if (!user) return;
     await importStudents(user.uid, names, students.length);
@@ -338,6 +344,7 @@ export default function App() {
                 }}
                 onUpdateName={handleUpdateStudentName}
                 onUpdateSeatNumber={handleUpdateStudentSeatNumber}
+                onUpdateScore={handleUpdateStudentScore}
               />
             ) : (
               <StudentImporter

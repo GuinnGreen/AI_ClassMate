@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   ChevronLeft, Sparkles, Save, Trash2, ClipboardList,
   Smile, Frown, School, Clock, Settings, Copy, AlignLeft,
-  Check, Lock, Download, BookX, Users, HelpCircle
+  Check, Lock, Download, BookX, Users, HelpCircle, Gift
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatDate } from '../utils/date';
@@ -16,6 +16,8 @@ import {
   saveStudentNote,
   setStudentAbsence,
   updateCustomBehaviors,
+  updatePrizes,
+  updateClassConfig,
   logAiGeneration,
   logCommentEdit,
   verifyPassword,
@@ -24,6 +26,7 @@ import { generateStudentComment, DEFAULT_SYSTEM_INSTRUCTION } from '../services/
 import { Modal } from './ui/Modal';
 import { WeeklyCalendar } from './WeeklyCalendar';
 import { BehaviorEditor } from './BehaviorEditor';
+import { PrizeEditor } from './PrizeEditor';
 import {
   Student,
   ClassConfig,
@@ -34,6 +37,8 @@ import {
   EVALUATION_CATEGORIES,
   AbsenceType,
   ABSENCE_TYPES,
+  PrizeItem,
+  DEFAULT_PRIZES,
 } from '../types';
 import { auth } from '../firebase';
 import { useAiRateLimit } from '../hooks/useAiRateLimit';
@@ -178,11 +183,28 @@ export const StudentDetailWorkspace = ({
 
   const positiveBehaviors = classConfig.customBehaviors?.positive || DEFAULT_POSITIVE_BEHAVIORS;
   const negativeBehaviors = classConfig.customBehaviors?.negative || DEFAULT_NEGATIVE_BEHAVIORS;
+  const prizes = classConfig.prizes || DEFAULT_PRIZES;
+  const prizeShopEnabled = classConfig.prizeShopEnabled ?? false;
 
   const handleUpdateBehaviors = async (type: 'positive' | 'negative', newBtns: BehaviorButton[]) => {
     const newConfig = await updateCustomBehaviors(
       userUid, classConfig, type, newBtns, positiveBehaviors, negativeBehaviors
     );
+    if (onConfigUpdate) onConfigUpdate(newConfig);
+  };
+
+  const handleUpdatePrizes = async (newPrizes: PrizeItem[]) => {
+    const newConfig = await updatePrizes(userUid, classConfig, newPrizes);
+    if (onConfigUpdate) onConfigUpdate(newConfig);
+  };
+
+  const handleRedeemPrize = (prize: PrizeItem) => {
+    handleAddPoint({ id: prize.id, label: `🎁 ${prize.label}`, value: -prize.cost });
+  };
+
+  const handleTogglePrizeShop = async () => {
+    const newConfig = { ...classConfig, prizeShopEnabled: !prizeShopEnabled };
+    await updateClassConfig(userUid, newConfig);
     if (onConfigUpdate) onConfigUpdate(newConfig);
   };
 
@@ -426,7 +448,8 @@ export const StudentDetailWorkspace = ({
   };
 
   const positiveGroups = groupPoints(dayRecord.points.filter(p => p.value > 0));
-  const negativeGroups = groupPoints(dayRecord.points.filter(p => p.value < 0));
+  const prizeGroups = groupPoints(dayRecord.points.filter(p => p.value < 0 && p.label.startsWith('🎁')));
+  const negativeGroups = groupPoints(dayRecord.points.filter(p => p.value < 0 && !p.label.startsWith('🎁')));
 
   return (
     <>
@@ -556,7 +579,7 @@ export const StudentDetailWorkspace = ({
 
                 <div className={`flex-1 flex flex-col min-h-[400px] lg:min-h-0 lg:overflow-hidden ${mobileTab !== 'record' ? 'hidden lg:flex' : ''}`}>
                   <h3 className={`font-bold ${theme.text} mb-2 shrink-0`}>當日紀錄</h3>
-                  <div className="flex-1 grid grid-cols-2 gap-3 lg:gap-4 min-h-0">
+                  <div className={`flex-1 grid ${prizeShopEnabled ? 'grid-cols-3' : 'grid-cols-2'} gap-3 lg:gap-4 min-h-0`}>
                     <div className={`rounded-2xl p-3 lg:p-4 border ${theme.border} ${theme.surface} h-fit`}>
                       <h4 className={`text-sm font-bold mb-3 flex items-center gap-2 ${theme.text}`}><div className={`w-2 h-2 rounded-full ${theme.accentPositive}`}></div> 正面表現</h4>
                       <div className="space-y-2">
@@ -604,6 +627,32 @@ export const StudentDetailWorkspace = ({
                         {negativeGroups.length === 0 && <div className={`text-center py-4 text-xs ${theme.textLight}`}>無紀錄</div>}
                       </div>
                     </div>
+
+                    {prizeShopEnabled && (
+                      <div className={`rounded-2xl p-3 lg:p-4 border ${theme.border} ${theme.surface} h-fit`}>
+                        <h4 className={`text-sm font-bold mb-3 flex items-center gap-2 ${theme.text}`}><Gift className="w-3.5 h-3.5 text-amber-500" /> 積分兌換</h4>
+                        <div className="space-y-2">
+                          {prizeGroups.map((group, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => handleDeleteGroup(group.label)}
+                              className={`w-full ${theme.surfaceAlt} p-2 lg:p-3 rounded-xl border ${theme.border} flex justify-between items-center group animate-pop-in transition-all duration-75 relative active:scale-95 transform`}
+                              title="點擊刪除一筆"
+                            >
+                              <span className={`font-bold text-sm ${theme.text}`}>{group.label.replace('🎁 ', '')}</span>
+                              <div className="flex items-center gap-2">
+                                <div className={`px-2 py-0.5 rounded-md text-xs font-bold bg-amber-100 text-amber-700`}>×{group.count}</div>
+                                <span className="text-amber-600 font-bold">{group.totalValue}</span>
+                              </div>
+                              <div className="absolute inset-0 bg-[#c48a8a]/90 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold text-xs backdrop-blur-sm">
+                                <Trash2 className="w-4 h-4 mr-1" /> 刪除一筆
+                              </div>
+                            </button>
+                          ))}
+                          {prizeGroups.length === 0 && <div className={`text-center py-4 text-xs ${theme.textLight}`}>無兌換</div>}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -644,12 +693,7 @@ export const StudentDetailWorkspace = ({
                   <div className="grid grid-cols-2 gap-2 lg:gap-3">
                     {positiveBehaviors.map((btn) => (
                       <button key={btn.id} onClick={() => handleAddPoint(btn)}
-                        className={`
-                            flex flex-col items-center justify-center p-3 lg:p-4 rounded-2xl
-                            border ${theme.border} ${theme.surfaceAlt}
-                            hover:${theme.primary} hover:text-white hover:border-transparent hover:shadow-lg hover:-translate-y-1
-                            transition-all duration-200 active:scale-95 group relative overflow-hidden active-shrink
-                          `}
+                        className={`flex flex-col items-center justify-center p-3 lg:p-4 rounded-2xl border ${theme.border} ${theme.surfaceAlt} hover:${theme.primary} hover:text-white hover:border-transparent hover:shadow-lg hover:-translate-y-1 transition-all duration-200 active:scale-95 group relative overflow-hidden active-shrink`}
                       >
                         <span className={`text-[1.5em] font-bold mb-1 ${theme.text} group-hover:text-white`}>+{btn.value}</span>
                         <span className={`text-[0.85em] font-medium ${theme.textLight} group-hover:text-white/90`}>{btn.label}</span>
@@ -663,12 +707,7 @@ export const StudentDetailWorkspace = ({
                   <div className="grid grid-cols-2 gap-2 lg:gap-3">
                     {negativeBehaviors.map((btn) => (
                       <button key={btn.id} onClick={() => handleAddPoint(btn)}
-                        className={`
-                            flex flex-col items-center justify-center p-3 lg:p-4 rounded-2xl
-                            border ${theme.border} ${theme.surfaceAlt}
-                            hover:${theme.accentNegative} hover:text-white hover:border-transparent hover:shadow-lg hover:-translate-y-1
-                            transition-all duration-200 active:scale-95 group relative overflow-hidden active-shrink
-                          `}
+                        className={`flex flex-col items-center justify-center p-3 lg:p-4 rounded-2xl border ${theme.border} ${theme.surfaceAlt} hover:${theme.accentNegative} hover:text-white hover:border-transparent hover:shadow-lg hover:-translate-y-1 transition-all duration-200 active:scale-95 group relative overflow-hidden active-shrink`}
                       >
                         <span className={`text-[1.5em] font-bold mb-1 ${theme.text} group-hover:text-white`}>{btn.value}</span>
                         <span className={`text-[0.85em] font-medium ${theme.textLight} group-hover:text-white/90`}>{btn.label}</span>
@@ -676,6 +715,22 @@ export const StudentDetailWorkspace = ({
                     ))}
                   </div>
                 </div>
+
+                {prizeShopEnabled && prizes.length > 0 && (
+                  <div className={`${theme.surface} p-3 lg:p-5 rounded-2xl border ${theme.border} shadow-sm`}>
+                    <label className={`text-sm font-bold ${theme.textLight} mb-4 flex items-center gap-2`}><Gift className="w-4 h-4 text-amber-500" /> 積分商店</label>
+                    <div className="grid grid-cols-2 gap-2 lg:gap-3">
+                      {prizes.map((prize) => (
+                        <button key={prize.id} onClick={() => handleRedeemPrize(prize)}
+                          className={`flex flex-col items-center justify-center p-3 lg:p-4 rounded-2xl border ${theme.border} ${theme.surfaceAlt} hover:bg-amber-500 hover:text-white hover:border-transparent hover:shadow-lg hover:-translate-y-1 transition-all duration-200 active:scale-95 group relative overflow-hidden active-shrink`}
+                        >
+                          <span className={`text-[1.5em] font-bold mb-1 ${theme.text} group-hover:text-white`}>-{prize.cost}</span>
+                          <span className={`text-[0.85em] font-medium ${theme.textLight} group-hover:text-white/90`}>{prize.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -719,7 +774,7 @@ export const StudentDetailWorkspace = ({
                                 className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border-2 w-full text-center
                                     ${student.tags.includes(tag)
                                     ? `${theme.primary} border-${theme.primary} text-white shadow-md transform scale-105`
-                                    : `border-transparent bg-white dark:bg-black/10 ${theme.text} hover:border-${theme.primary}`
+                                    : `border-transparent ${theme.surfaceAccent} ${theme.text} hover:border-${theme.primary}`
                                   }
                                   `}
                               >
@@ -741,7 +796,7 @@ export const StudentDetailWorkspace = ({
                                 className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border-2 w-full text-center
                                     ${student.tags.includes(tag)
                                     ? `${theme.accentNegative} border-${theme.accentNegative} text-white shadow-md transform scale-105`
-                                    : `border-transparent bg-white dark:bg-black/10 ${theme.text} hover:border-${theme.accentNegative}`
+                                    : `border-transparent ${theme.surfaceAccent} ${theme.text} hover:border-${theme.accentNegative}`
                                   }
                                   `}
                               >
@@ -921,9 +976,21 @@ export const StudentDetailWorkspace = ({
 
       <Modal isOpen={isBehaviorSettingsOpen} onClose={() => setIsBehaviorSettingsOpen(false)} title="⚙️ 自訂快速記分按鈕">
         <div className="space-y-6">
+          <div className={`flex items-center justify-between p-3 rounded-xl border ${theme.border} ${theme.surfaceAlt}`}>
+            <span className={`font-bold ${theme.text} flex items-center gap-2`}><Gift className="w-4 h-4 text-amber-500" /> 啟用積分商店</span>
+            <button
+              onClick={handleTogglePrizeShop}
+              className={`relative w-12 h-6 rounded-full transition-colors ${prizeShopEnabled ? theme.primary : theme.surfaceAccent}`}
+            >
+              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${prizeShopEnabled ? 'left-7' : 'left-1'}`} />
+            </button>
+          </div>
+          <div className={`border-t ${theme.border}`}></div>
           <BehaviorEditor buttons={positiveBehaviors} onUpdate={(btns) => handleUpdateBehaviors('positive', btns)} title="正面表現 (Positive)" fixedValue={1} />
           <div className={`border-t ${theme.border}`}></div>
           <BehaviorEditor buttons={negativeBehaviors} onUpdate={(btns) => handleUpdateBehaviors('negative', btns)} title="待改進 (Improvement)" fixedValue={-1} />
+          <div className={`border-t ${theme.border}`}></div>
+          <PrizeEditor prizes={prizes} onUpdate={handleUpdatePrizes} />
           <div className="pt-2">
             <button onClick={() => setIsBehaviorSettingsOpen(false)} className={`w-full py-3 ${theme.primary} text-white rounded-xl font-bold`}>完成設定</button>
           </div>

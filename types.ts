@@ -38,6 +38,13 @@ export interface BehaviorButton {
   value: number;
 }
 
+// 定義獎品配置
+export interface PrizeItem {
+  id: string;
+  label: string;  // 例如: "小貼紙"
+  cost: number;   // 兌換所需積分（正數，記帳時自動取負）
+}
+
 // --- 書寫方向 ---
 export type BoardWritingMode = 'horizontal-tb' | 'vertical-lr' | 'vertical-rl';
 
@@ -80,6 +87,8 @@ export interface ClassConfig {
   zhuyinMode?: boolean;  // 注音字型開關（預設 false）
   semesterStart?: string; // "YYYY-MM-DD"
   semesterEnd?: string;   // "YYYY-MM-DD"
+  prizes?: PrizeItem[];   // 獎品兌換清單
+  prizeShopEnabled?: boolean; // 積分商店開關（預設 false）
 }
 
 export const DEFAULT_POSITIVE_BEHAVIORS: BehaviorButton[] = [
@@ -87,6 +96,12 @@ export const DEFAULT_POSITIVE_BEHAVIORS: BehaviorButton[] = [
   { id: 'p2', label: '熱心服務', value: 1 },
   { id: 'p3', label: '作業優良', value: 1 },
   { id: 'p4', label: '小組合作', value: 1 },
+];
+
+export const DEFAULT_PRIZES: PrizeItem[] = [
+  { id: 'pr1', label: '小貼紙', cost: 5 },
+  { id: 'pr2', label: '書籤', cost: 10 },
+  { id: 'pr3', label: '鉛筆', cost: 15 },
 ];
 
 export const DEFAULT_NEGATIVE_BEHAVIORS: BehaviorButton[] = [
