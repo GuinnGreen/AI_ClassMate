@@ -988,9 +988,9 @@ export const StudentDetailWorkspace = ({
             </button>
           </div>
           <div className={`border-t ${theme.border}`}></div>
-          <BehaviorEditor buttons={positiveBehaviors} onUpdate={(btns) => handleUpdateBehaviors('positive', btns)} title="正面表現 (Positive)" fixedValue={1} />
+          <BehaviorEditor buttons={positiveBehaviors} onUpdate={(btns) => handleUpdateBehaviors('positive', btns)} title="正面表現 (Positive)" defaultValue={1} />
           <div className={`border-t ${theme.border}`}></div>
-          <BehaviorEditor buttons={negativeBehaviors} onUpdate={(btns) => handleUpdateBehaviors('negative', btns)} title="待改進 (Improvement)" fixedValue={-1} />
+          <BehaviorEditor buttons={negativeBehaviors} onUpdate={(btns) => handleUpdateBehaviors('negative', btns)} title="待改進 (Improvement)" defaultValue={-1} />
           <div className={`border-t ${theme.border}`}></div>
           <PrizeEditor prizes={prizes} onUpdate={handleUpdatePrizes} />
           <div className="pt-2">
