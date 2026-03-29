@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatDate } from '../utils/date';
+import { getCurrentSemester } from '../utils/semester';
 import { levenshteinDistance } from '../utils/levenshtein';
 import {
   addPointToStudent,
@@ -83,10 +84,13 @@ export const StudentDetailWorkspace = ({
 
   // Export State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportTab, setExportTab] = useState<'class' | 'counseling'>('class');
+  const [counselingClassCode, setCounselingClassCode] = useState('');
+  const [counselingGrade, setCounselingGrade] = useState('');
   const [exportFields, setExportFields] = useState({
     behaviorDetail: true,
     dailyScore: true,
-    note: false,
+    note: false, // kept for export logic but removed from UI
     aiComment: true,
     tags: true,
     totalScore: true,
@@ -163,6 +167,49 @@ export const StudentDetailWorkspace = ({
     XLSX.utils.book_append_sheet(wb, ws, '班級紀錄');
     const today = formatDate(new Date());
     XLSX.writeFile(wb, `班級紀錄_${today}.xlsx`);
+    setIsExportModalOpen(false);
+  };
+
+  const handleExportCounseling = () => {
+    const semester = getCurrentSemester();
+    const academicYear = parseInt(semester.label);
+    const semesterNum = semester.label.includes('上') ? 1 : 2;
+
+    const headers = ['學年', '學期', '學號', '班級代碼', '座號', '年級', '日期', '晤談對象', '輔導內容要點', '他校記錄者', '記錄者學校'];
+    const rows: (string | number)[][] = [];
+
+    const sortedStudents = [...students].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    for (const s of sortedStudents) {
+      const seatNum = String(s.seatNumber ?? (s.order ?? 0) + 1).padStart(2, '0');
+      const dates = Object.keys(s.dailyRecords).sort();
+
+      for (const date of dates) {
+        if (date < semester.semesterStart || date > semester.semesterEnd) continue;
+        const record = s.dailyRecords[date];
+        if (!record.note || !record.note.trim()) continue;
+
+        rows.push([
+          academicYear,
+          semesterNum,
+          '',
+          counselingClassCode,
+          seatNum,
+          counselingGrade ? parseInt(counselingGrade) : '',
+          date.replace(/-/g, ''),
+          '學生',
+          record.note.trim(),
+          '',
+          '',
+        ]);
+      }
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '工作表1');
+    const today = formatDate(new Date());
+    XLSX.writeFile(wb, `輔導紀錄_${today}.xls`, { bookType: 'biff8' });
     setIsExportModalOpen(false);
   };
 
@@ -459,7 +506,7 @@ export const StudentDetailWorkspace = ({
               總積分 <span className={`px-2 py-0.5 rounded-lg text-sm font-bold ${student.totalScore >= 0 ? `${theme.accentPositive} text-white` : `${theme.accentNegative} text-white`}`}>{student.totalScore > 0 ? '+' : ''}{student.totalScore}</span>
             </div>
           </div>
-          <div className="flex items-center gap-1 lg:gap-2 flex-nowrap overflow-x-auto">
+          <div className="flex items-center gap-1 lg:gap-2 flex-nowrap overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {/* 今日請假 */}
             <div className={`flex items-center gap-1 ${theme.surfaceAlt} p-1.5 rounded-xl`}>
               {!isAbsenceExpanded ? (
@@ -503,7 +550,7 @@ export const StudentDetailWorkspace = ({
             </div>
             <button
               onClick={() => { setPendingAction('notes'); setShowPasswordModal(true); }}
-              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} transition text-sm font-bold`}
+              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} hover:shadow-md hover:scale-105 transition-all duration-200 text-sm font-bold`}
               title="輔導紀錄"
             >
               {hasNote ? <Check className={`w-4 h-4 ${theme.primaryText}`} /> : <Lock className="w-4 h-4" />}
@@ -518,13 +565,13 @@ export const StudentDetailWorkspace = ({
               target="_blank"
               rel="noopener noreferrer"
               title="操作教學"
-              className={`p-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} transition`}
+              className={`p-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} hover:shadow-md hover:scale-110 transition-all duration-200`}
             >
               <HelpCircle className="w-5 h-5" />
             </a>
             <button
               onClick={() => { setPendingAction('export'); setShowPasswordModal(true); }}
-              className={`p-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} transition`}
+              className={`p-2.5 rounded-xl ${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} hover:shadow-md hover:scale-110 transition-all duration-200`}
               title="匯出整班紀錄"
             >
               <Download className="w-5 h-5" />
@@ -652,7 +699,7 @@ export const StudentDetailWorkspace = ({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setIsClassMode(prev => !prev)}
-                      className={`p-2 rounded-lg transition flex items-center gap-1.5 text-xs font-bold
+                      className={`p-2 rounded-lg transition-all duration-200 flex items-center gap-1.5 text-xs font-bold hover:shadow-md hover:scale-110
                         ${isClassMode
                           ? `${theme.primary} text-white shadow`
                           : `hover:${theme.surfaceAlt} ${theme.textLight}`
@@ -662,7 +709,7 @@ export const StudentDetailWorkspace = ({
                       <Users className="w-4 h-4" />
                       <span className="hidden lg:inline">{isClassMode ? '全班' : ''}</span>
                     </button>
-                    <button onClick={() => setIsBehaviorSettingsOpen(true)} className={`p-2 rounded-lg hover:${theme.surfaceAlt} ${theme.textLight} transition`} title="自訂按鈕">
+                    <button onClick={() => setIsBehaviorSettingsOpen(true)} className={`p-2 rounded-lg hover:${theme.surfaceAlt} hover:shadow-md hover:scale-110 ${theme.textLight} transition-all duration-200`} title="自訂按鈕">
                       <Settings className="w-4 h-4" />
                     </button>
                   </div>
@@ -984,45 +1031,105 @@ export const StudentDetailWorkspace = ({
         </div>
       </Modal>
 
-      {/* Export Excel Modal */}
-      <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title="匯出整班紀錄">
+      {/* Export Modal */}
+      <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title="匯出資料">
         <div className="space-y-4">
-          <p className={`text-sm ${theme.textLight}`}>請勾選要匯出的欄位，固定欄位（座號、姓名、日期）會自動包含。</p>
-          <div className="space-y-3">
-            {([
-              { key: 'behaviorDetail' as const, label: '行為紀錄明細' },
-              { key: 'dailyScore' as const, label: '當日得分' },
-              { key: 'note' as const, label: '輔導備註', warning: '含隱私資料' },
-              { key: 'aiComment' as const, label: 'AI 評語' },
-              { key: 'tags' as const, label: '特質標籤' },
-              { key: 'totalScore' as const, label: '累計總分' },
-            ]).map(({ key, label, warning }) => (
-              <label key={key} className={`flex items-center gap-3 p-3 rounded-xl border ${theme.border} ${theme.surface} cursor-pointer hover:${theme.surfaceAlt} transition`}>
-                <input
-                  type="checkbox"
-                  checked={exportFields[key]}
-                  onChange={() => setExportFields(prev => ({ ...prev, [key]: !prev[key] }))}
-                  className="w-4 h-4 rounded accent-current"
-                />
-                <span className={`font-bold text-sm ${theme.text}`}>{label}</span>
-                {warning && <span className="text-xs text-red-400 font-bold">{warning}</span>}
-              </label>
-            ))}
-          </div>
-          <div className="flex gap-2 pt-2">
+          {/* Tab Switcher */}
+          <div className={`flex rounded-xl border ${theme.border} overflow-hidden`}>
             <button
-              onClick={handleExportXlsx}
-              className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2`}
+              onClick={() => setExportTab('class')}
+              className={`flex-1 py-2.5 text-sm font-bold transition ${exportTab === 'class' ? `${theme.primary} text-white` : `${theme.surface} ${theme.text}`}`}
             >
-              <Download className="w-4 h-4" /> 匯出 Excel
+              整班紀錄
             </button>
             <button
-              onClick={() => setIsExportModalOpen(false)}
-              className={`flex-1 py-3 ${theme.surfaceAlt} ${theme.text} rounded-xl font-bold hover:opacity-80 transition`}
+              onClick={() => setExportTab('counseling')}
+              className={`flex-1 py-2.5 text-sm font-bold transition ${exportTab === 'counseling' ? `${theme.primary} text-white` : `${theme.surface} ${theme.text}`}`}
             >
-              取消
+              輔導紀錄
             </button>
           </div>
+
+          {exportTab === 'class' ? (
+            <>
+              <p className={`text-sm ${theme.textLight}`}>請勾選要匯出的欄位，固定欄位（座號、姓名、日期）會自動包含。</p>
+              <div className="space-y-3">
+                {([
+                  { key: 'behaviorDetail' as const, label: '行為紀錄明細' },
+                  { key: 'dailyScore' as const, label: '當日得分' },
+                      { key: 'aiComment' as const, label: 'AI 評語' },
+                  { key: 'tags' as const, label: '特質標籤' },
+                  { key: 'totalScore' as const, label: '累計總分' },
+                ]).map(({ key, label, warning }) => (
+                  <label key={key} className={`flex items-center gap-3 p-3 rounded-xl border ${theme.border} ${theme.surface} cursor-pointer hover:${theme.surfaceAlt} transition`}>
+                    <input
+                      type="checkbox"
+                      checked={exportFields[key]}
+                      onChange={() => setExportFields(prev => ({ ...prev, [key]: !prev[key] }))}
+                      className="w-4 h-4 rounded accent-current"
+                    />
+                    <span className={`font-bold text-sm ${theme.text}`}>{label}</span>
+                    {warning && <span className="text-xs text-red-400 font-bold">{warning}</span>}
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleExportXlsx}
+                  className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2`}
+                >
+                  <Download className="w-4 h-4" /> 匯出 Excel
+                </button>
+                <button
+                  onClick={() => setIsExportModalOpen(false)}
+                  className={`flex-1 py-3 ${theme.surfaceAlt} ${theme.text} rounded-xl font-bold hover:opacity-80 transition`}
+                >
+                  取消
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className={`text-sm ${theme.textLight}`}>匯出符合台南市輔導系統格式的 XLS 檔案，僅包含學期內有輔導備註的紀錄。</p>
+              <div className="space-y-3">
+                <div>
+                  <label className={`block text-sm font-bold mb-1 ${theme.text}`}>班級代碼</label>
+                  <input
+                    type="text"
+                    value={counselingClassCode}
+                    onChange={(e) => setCounselingClassCode(e.target.value)}
+                    placeholder="例如 101"
+                    className={`w-full p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} outline-none focus:ring-2 ${theme.focusRing}`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-bold mb-1 ${theme.text}`}>年級</label>
+                  <input
+                    type="text"
+                    value={counselingGrade}
+                    onChange={(e) => setCounselingGrade(e.target.value)}
+                    placeholder="例如 1"
+                    className={`w-full p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} outline-none focus:ring-2 ${theme.focusRing}`}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleExportCounseling}
+                  disabled={!counselingClassCode || !counselingGrade}
+                  className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-40`}
+                >
+                  <Download className="w-4 h-4" /> 匯出輔導紀錄
+                </button>
+                <button
+                  onClick={() => setIsExportModalOpen(false)}
+                  className={`flex-1 py-3 ${theme.surfaceAlt} ${theme.text} rounded-xl font-bold hover:opacity-80 transition`}
+                >
+                  取消
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 

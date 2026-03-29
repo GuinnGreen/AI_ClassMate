@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Users, LogOut, School, Edit3, Moon, Sun,
-  Plus, Minus, Type, Sunset, BarChart2, PanelLeftClose, Languages, Bell
+  Plus, Minus, Type, Sunset, BarChart2, PanelLeftClose, Languages, Bell, Archive
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { useTheme } from '../contexts/ThemeContext';
@@ -116,7 +116,7 @@ export const Sidebar = ({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setShowNotifications(true)}
-                className={`relative p-2 rounded-lg hover:${theme.surface} ${theme.textLight} hover:${theme.text} transition`}
+                className={`relative p-2 rounded-lg hover:${theme.surface} hover:shadow-md hover:scale-110 ${theme.textLight} hover:${theme.text} transition-all duration-200`}
                 title="系統通知"
               >
                 <Bell className="w-5 h-5" />
@@ -129,7 +129,7 @@ export const Sidebar = ({
               </button>
               <button
                 onClick={onToggleSidebarCollapse}
-                className={`hidden lg:flex p-2 rounded-lg hover:${theme.surface} ${theme.textLight} hover:${theme.text} transition`}
+                className={`hidden lg:flex p-2 rounded-lg hover:${theme.surface} hover:shadow-md hover:scale-110 ${theme.textLight} hover:${theme.text} transition-all duration-200`}
                 title="收合側邊欄"
               >
                 <PanelLeftClose className="w-5 h-5" />
@@ -232,35 +232,35 @@ export const Sidebar = ({
 
         {/* Footer Section */}
         <div className={`p-4 border-t ${theme.border} space-y-3 shrink-0`}>
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-0.5">
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                className={`p-2 rounded-lg hover:${theme.surface} ${theme.textLight} hover:${theme.text} transition`}
+                className={`p-1.5 rounded-lg hover:${theme.surface} hover:shadow-md hover:scale-110 ${theme.textLight} hover:${theme.text} transition-all duration-200`}
                 title="切換深色模式"
               >
-                {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                {isDarkMode ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
               </button>
               <button
                 onClick={() => setShowNapSettings(true)}
-                className={`p-2 rounded-lg hover:${theme.surface} transition ${napTimeStart && napTimeEnd ? theme.text : theme.textLight} hover:${theme.text}`}
+                className={`p-1.5 rounded-lg hover:${theme.surface} hover:shadow-md hover:scale-110 transition-all duration-200 ${napTimeStart && napTimeEnd ? theme.text : theme.textLight} hover:${theme.text}`}
                 title="午休自動深色設定"
               >
-                <Sunset className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setShowSemesterSettings(true)}
-                className={`text-xs font-bold ${theme.textLight} px-2 py-1 rounded-lg hover:${theme.surface} transition`}
-                title="學期封存"
-              >
-                {semester.label}
+                <Sunset className="w-4.5 h-4.5" />
               </button>
               <button
                 onClick={onZhuyinToggle}
-                className={`p-2 rounded-lg hover:${theme.surface} transition ${zhuyinMode ? theme.text : theme.textLight} hover:${theme.text}`}
+                className={`p-1.5 rounded-lg hover:${theme.surface} hover:shadow-md hover:scale-110 transition-all duration-200 ${zhuyinMode ? theme.text : theme.textLight} hover:${theme.text}`}
                 title="注音字型開關"
               >
-                <Languages className="w-5 h-5" />
+                <Languages className="w-4.5 h-4.5" />
+              </button>
+              <button
+                onClick={() => setShowSemesterSettings(true)}
+                className={`p-1.5 rounded-lg hover:${theme.surface} hover:shadow-md hover:scale-110 ${theme.textLight} hover:${theme.text} transition-all duration-200`}
+                title="學期封存"
+              >
+                <Archive className="w-4.5 h-4.5" />
               </button>
             </div>
             <div className={`flex items-center gap-1 ${theme.surface} rounded-lg border ${theme.border} p-1`}>

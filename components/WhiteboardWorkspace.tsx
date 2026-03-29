@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { getCurrentTime } from '../utils/date';
 import { isCurrentPeriod, getPeriodParts } from '../utils/schedule';
 import { updateClassConfig } from '../services/firebaseService';
+import { getCurrentSemester } from '../utils/semester';
 import { Modal } from './ui/Modal';
 import { ManualScheduleEditor } from './ManualScheduleEditor';
 import { BoardTemplateEditor } from './BoardTemplateEditor';
@@ -463,6 +464,7 @@ export const WhiteboardWorkspace = ({
                   明日
                 </button>
               </div>
+              <span className={`text-xs ${theme.textLight} hidden sm:inline`}>{getCurrentSemester().label}</span>
             </div>
             <button
               onClick={() => setShowScheduleEditor(true)}

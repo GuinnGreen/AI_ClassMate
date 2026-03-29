@@ -97,19 +97,19 @@ export const WeeklyCalendar = ({
       <button
         key={dStr}
         onClick={() => handleDateClick(d)}
-        className={`flex flex-col items-center justify-center transition-all relative
+        className={`flex flex-col items-center justify-center transition-all duration-200 relative
           ${outsideMonth ? 'opacity-30' : ''}
           ${isSelected
-            ? `${theme.primary} text-white shadow-md${isWeek ? ' transform scale-105' : ''}`
-            : `hover:${theme.surfaceAlt} ${theme.text}`
+            ? `${theme.primary} text-white shadow-[inset_0_0_0_3px_rgba(0,0,0,0.2)]${isWeek ? ' transform scale-105' : ''}`
+            : `hover:${theme.surfaceAlt} hover:shadow-[inset_0_0_0_2px_rgba(0,0,0,0.15)] ${theme.text}`
           }
           ${isToday && !isSelected ? `ring-2 ring-inset ${theme.focusRing}` : ''}
-          ${isWeek ? 'p-2 rounded-xl' : 'p-1.5 rounded-lg'}`}
+          ${isWeek ? 'p-3 rounded-xl' : 'p-1.5 rounded-xl'}`}
       >
         <span className={`font-bold leading-none ${isWeek ? 'text-base' : 'text-sm'}`}>{d.getDate()}</span>
         <div className={`flex items-center ${isWeek ? 'gap-1 mt-1.5 h-1.5' : 'gap-0.5 mt-1 h-1'}`}>
           {hasPositive && <div className={`rounded-full ${isSelected ? 'bg-white' : theme.accentPositive} ${isWeek ? 'w-1.5 h-1.5' : 'w-1 h-1'}`}></div>}
-          {hasNegative && <div className={`rounded-full ${isSelected ? 'bg-[#e6bwbw]' : theme.accentNegative} ${isWeek ? 'w-1.5 h-1.5' : 'w-1 h-1'}`}></div>}
+          {hasNegative && <div className={`rounded-full ${isSelected ? 'bg-[#e6bbbb]' : theme.accentNegative} ${isWeek ? 'w-1.5 h-1.5' : 'w-1 h-1'}`}></div>}
           {absence && <span className={`font-bold leading-none ${isSelected ? 'text-white/90' : 'text-orange-500'} ${isWeek ? 'text-[9px]' : 'text-[8px]'}`}>{absence[0]}</span>}
         </div>
         {hasNote && (
@@ -152,7 +152,7 @@ export const WeeklyCalendar = ({
       </div>
 
       {/* Weekday header — always visible */}
-      <div className="grid grid-cols-7 gap-1 mb-1 shrink-0">
+      <div className="grid grid-cols-7 gap-1 mb-1 shrink-0 px-1">
         {weekDays.map(wd => (
           <div key={wd} className={`text-center text-[10px] font-bold opacity-50 ${theme.text}`}>{wd}</div>
         ))}
@@ -161,7 +161,7 @@ export const WeeklyCalendar = ({
       {/* Month grid — single 6-row grid with expand/collapse animation */}
       <div
         key={`${monthGrid.year}-${monthGrid.month}`}
-        className={`flex-1 overflow-hidden ${slideDirection === 'left' ? 'animate-slide-in-left' : slideDirection === 'right' ? 'animate-slide-in-right' : ''}`}
+        className={`flex-1 overflow-hidden px-1 pb-1 ${slideDirection === 'left' ? 'animate-slide-in-left' : slideDirection === 'right' ? 'animate-slide-in-right' : ''}`}
         style={{
           display: 'grid',
           gridTemplateRows: [0, 1, 2, 3, 4, 5]
