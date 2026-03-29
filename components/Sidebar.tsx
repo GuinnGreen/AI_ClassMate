@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import {
   Users, LogOut, School, Edit3, Moon, Sun,
-  Plus, Minus, Type, Sunset, BarChart2, Calendar, PanelLeftClose, Languages, Bell
+  Plus, Minus, Type, Sunset, BarChart2, PanelLeftClose, Languages, Bell
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { useTheme } from '../contexts/ThemeContext';
 import { Modal } from './ui/Modal';
 import { Student, ClassConfig, Announcement } from '../types';
 import { formatDate } from '../utils/date';
-import { updateClassConfig, archiveSemester } from '../services/firebaseService';
+import { archiveSemester } from '../services/firebaseService';
+import { getCurrentSemester } from '../utils/semester';
 import { AbsenceStatsModal } from './AbsenceStatsModal';
 import { NotificationPanel } from './NotificationPanel';
 
@@ -66,8 +67,7 @@ export const Sidebar = ({
   const [napStart, setNapStart] = useState(napTimeStart || '');
   const [napEnd, setNapEnd] = useState(napTimeEnd || '');
   const [showSemesterSettings, setShowSemesterSettings] = useState(false);
-  const [semStart, setSemStart] = useState(classConfig.semesterStart || '');
-  const [semEnd, setSemEnd] = useState(classConfig.semesterEnd || '');
+  const semester = getCurrentSemester();
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [archivePassword, setArchivePassword] = useState('');
   const [archiveError, setArchiveError] = useState('');
@@ -80,11 +80,6 @@ export const Sidebar = ({
     setNapStart(napTimeStart || '');
     setNapEnd(napTimeEnd || '');
   }, [napTimeStart, napTimeEnd]);
-
-  useEffect(() => {
-    setSemStart(classConfig.semesterStart || '');
-    setSemEnd(classConfig.semesterEnd || '');
-  }, [classConfig.semesterStart, classConfig.semesterEnd]);
 
   const today = formatDate(new Date());
 
@@ -255,10 +250,10 @@ export const Sidebar = ({
               </button>
               <button
                 onClick={() => setShowSemesterSettings(true)}
-                className={`p-2 rounded-lg hover:${theme.surface} transition ${classConfig.semesterStart && classConfig.semesterEnd ? theme.text : theme.textLight} hover:${theme.text}`}
-                title="學期設定"
+                className={`text-xs font-bold ${theme.textLight} px-2 py-1 rounded-lg hover:${theme.surface} transition`}
+                title="學期封存"
               >
-                <Calendar className="w-5 h-5" />
+                {semester.label}
               </button>
               <button
                 onClick={onZhuyinToggle}
@@ -306,51 +301,21 @@ export const Sidebar = ({
         isOpen={showAbsenceStats}
         onClose={() => setShowAbsenceStats(false)}
         students={students}
-        semesterStart={classConfig.semesterStart}
-        semesterEnd={classConfig.semesterEnd}
+        semesterStart={semester.semesterStart}
+        semesterEnd={semester.semesterEnd}
       />
 
-      {/* Semester Settings Modal */}
+      {/* Semester Archive Modal */}
       <Modal
         isOpen={showSemesterSettings}
         onClose={() => { setShowSemesterSettings(false); setShowArchiveConfirm(false); setArchivePassword(''); setArchiveError(''); }}
-        title="學期設定"
+        title="學期封存"
         maxWidth="max-w-sm"
       >
         <div className="space-y-4">
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className={`block text-sm font-bold mb-1 ${theme.text}`}>學期開始</label>
-              <input
-                type="date"
-                value={semStart}
-                onChange={(e) => setSemStart(e.target.value)}
-                className={`w-full p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} outline-none focus:ring-2 ${theme.focusRing}`}
-              />
-            </div>
-            <div className="flex-1">
-              <label className={`block text-sm font-bold mb-1 ${theme.text}`}>學期結束</label>
-              <input
-                type="date"
-                value={semEnd}
-                onChange={(e) => setSemEnd(e.target.value)}
-                className={`w-full p-2 rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} outline-none focus:ring-2 ${theme.focusRing}`}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <button
-              onClick={async () => {
-                const newConfig = { ...classConfig, semesterStart: semStart, semesterEnd: semEnd };
-                onConfigUpdate(newConfig);
-                await updateClassConfig(userUid, newConfig);
-                setShowSemesterSettings(false);
-              }}
-              disabled={!semStart || !semEnd}
-              className={`px-4 py-2 rounded-lg text-sm font-bold ${theme.primary} text-white transition disabled:opacity-40`}
-            >
-              儲存
-            </button>
+          <div className={`p-3 rounded-xl ${theme.surfaceAccent} border ${theme.border}`}>
+            <p className={`text-sm font-bold ${theme.text}`}>{semester.label}</p>
+            <p className={`text-xs ${theme.textLight} mt-1`}>{semester.semesterStart} ~ {semester.semesterEnd}</p>
           </div>
 
           <div className={`border-t ${theme.border} pt-4`}>
