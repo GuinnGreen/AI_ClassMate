@@ -40,6 +40,7 @@ import {
   PrizeItem,
   DEFAULT_PRIZES,
 } from '../types';
+import * as XLSX from 'xlsx';
 import { auth } from '../firebase';
 import { useAiRateLimit } from '../hooks/useAiRateLimit';
 
@@ -80,7 +81,7 @@ export const StudentDetailWorkspace = ({
   // Behavior Settings Modal
   const [isBehaviorSettingsOpen, setIsBehaviorSettingsOpen] = useState(false);
 
-  // Export CSV State
+  // Export State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFields, setExportFields] = useState({
     behaviorDetail: true,
@@ -91,14 +92,7 @@ export const StudentDetailWorkspace = ({
     totalScore: true,
   });
 
-  const escapeCsvValue = (val: string): string => {
-    if (val.includes(',') || val.includes('\n') || val.includes('"')) {
-      return '"' + val.replace(/"/g, '""') + '"';
-    }
-    return val;
-  };
-
-  const handleExportCsv = () => {
+  const handleExportXlsx = () => {
     const headers = ['座號', '姓名', '日期'];
     if (exportFields.behaviorDetail) headers.push('行為紀錄明細');
     if (exportFields.dailyScore) headers.push('當日得分');
@@ -107,7 +101,7 @@ export const StudentDetailWorkspace = ({
     if (exportFields.tags) headers.push('特質標籤');
     if (exportFields.totalScore) headers.push('累計總分');
 
-    const rows: string[][] = [];
+    const rows: (string | number)[][] = [];
 
     const sortedStudents = [...students].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
@@ -120,8 +114,8 @@ export const StudentDetailWorkspace = ({
         const hasNote = record.note && record.note.trim().length > 0;
         if (!hasPoints && !hasNote) continue;
 
-        const row: string[] = [
-          String(s.seatNumber ?? (s.order ?? 0) + 1),
+        const row: (string | number)[] = [
+          s.seatNumber ?? (s.order ?? 0) + 1,
           s.name,
           date,
         ];
@@ -140,7 +134,7 @@ export const StudentDetailWorkspace = ({
 
         if (exportFields.dailyScore) {
           const score = record.points.reduce((sum, p) => sum + p.value, 0);
-          row.push(String(score));
+          row.push(score);
         }
 
         if (exportFields.note) {
@@ -156,7 +150,7 @@ export const StudentDetailWorkspace = ({
         }
 
         if (exportFields.totalScore) {
-          row.push(isFirstRow ? String(s.totalScore) : '');
+          row.push(isFirstRow ? s.totalScore : '');
         }
 
         rows.push(row);
@@ -164,20 +158,11 @@ export const StudentDetailWorkspace = ({
       }
     }
 
-    const csvContent = '\uFEFF' +
-      headers.map(escapeCsvValue).join(',') + '\n' +
-      rows.map(row => row.map(escapeCsvValue).join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '班級紀錄');
     const today = formatDate(new Date());
-    a.href = url;
-    a.download = `班級紀錄_${today}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    XLSX.writeFile(wb, `班級紀錄_${today}.xlsx`);
     setIsExportModalOpen(false);
   };
 
@@ -999,7 +984,7 @@ export const StudentDetailWorkspace = ({
         </div>
       </Modal>
 
-      {/* Export CSV Modal */}
+      {/* Export Excel Modal */}
       <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title="匯出整班紀錄">
         <div className="space-y-4">
           <p className={`text-sm ${theme.textLight}`}>請勾選要匯出的欄位，固定欄位（座號、姓名、日期）會自動包含。</p>
@@ -1026,10 +1011,10 @@ export const StudentDetailWorkspace = ({
           </div>
           <div className="flex gap-2 pt-2">
             <button
-              onClick={handleExportCsv}
+              onClick={handleExportXlsx}
               className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2`}
             >
-              <Download className="w-4 h-4" /> 匯出 CSV
+              <Download className="w-4 h-4" /> 匯出 Excel
             </button>
             <button
               onClick={() => setIsExportModalOpen(false)}
