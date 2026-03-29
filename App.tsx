@@ -189,13 +189,6 @@ export default function App() {
     alert(`成功匯入 ${names.length} 位學生！`);
   };
 
-  const handleSemesterChange = async (start: string, end: string) => {
-    if (!user) return;
-    const newConfig = { ...classConfig, semesterStart: start, semesterEnd: end };
-    setClassConfig(newConfig);
-    await updateClassConfig(user.uid, newConfig);
-  };
-
   const getFontSizeClass = () => {
     switch (fontSizeLevel) {
       case 0: return 'text-sm';
@@ -349,9 +342,6 @@ export default function App() {
             ) : (
               <StudentImporter
                 onImport={handleImportStudents}
-                semesterStart={classConfig.semesterStart || ''}
-                semesterEnd={classConfig.semesterEnd || ''}
-                onSemesterChange={handleSemesterChange}
               />
             )}
           </Modal>
