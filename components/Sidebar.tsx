@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import {
   Users, LogOut, School, Edit3, Moon, Sun,
-  Plus, Minus, Type, Sunset, BarChart2, PanelLeftClose, Languages, Bell, Archive
+  Plus, Minus, Type, Sunset, BarChart2, PanelLeftClose, Languages, Bell, Archive, Settings
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { useTheme } from '../contexts/ThemeContext';
 import { Modal } from './ui/Modal';
-import { Student, ClassConfig, Announcement } from '../types';
+import { Student, ClassConfig, Announcement, CorrectionItem } from '../types';
 import { formatDate } from '../utils/date';
 import { archiveSemester } from '../services/firebaseService';
 import { getCurrentSemester } from '../utils/semester';
 import { AbsenceStatsModal } from './AbsenceStatsModal';
 import { NotificationPanel } from './NotificationPanel';
+import { CorrectionList } from './CorrectionList';
 
 export const Sidebar = ({
   students,
@@ -30,6 +31,7 @@ export const Sidebar = ({
   onConfigUpdate,
   userUid,
   user,
+  corrections,
   isSidebarCollapsed,
   onToggleSidebarCollapse,
   zhuyinMode,
@@ -53,6 +55,7 @@ export const Sidebar = ({
   onConfigUpdate: (config: ClassConfig) => void;
   userUid: string;
   user: User;
+  corrections: CorrectionItem[];
   isSidebarCollapsed: boolean;
   onToggleSidebarCollapse: () => void;
   zhuyinMode: boolean;
@@ -73,6 +76,8 @@ export const Sidebar = ({
   const [archiveError, setArchiveError] = useState('');
   const [archiving, setArchiving] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<'students' | 'corrections'>('students');
+  const [isEditingCorrectionPresets, setIsEditingCorrectionPresets] = useState(false);
 
   const unreadCount = announcements.filter(a => !readAnnouncementIds.includes(a.id)).length;
 
@@ -138,96 +143,143 @@ export const Sidebar = ({
           </div>
         </div>
 
-        {/* Student List Section */}
+        {/* Student List / Correction List Section */}
         <div className="flex-1 flex flex-col min-h-0">
           <div className={`px-4 py-3 flex items-center justify-between shrink-0`}>
-            <span className={`text-xs font-bold ${theme.textLight} uppercase tracking-wider`}>學生名單 ({students.length})</span>
-            <div className="flex items-center gap-1">
+            {/* Tab 切換 */}
+            <div className={`flex ${theme.bg} p-0.5 rounded-lg`}>
               <button
-                onClick={() => setShowAbsenceStats(true)}
-                className={`p-1.5 rounded-lg hover:${theme.surface} transition ${theme.textLight} hover:${theme.text}`}
-                title="月請假統計"
+                onClick={() => setSidebarTab('students')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-md transition
+                  ${sidebarTab === 'students' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}
               >
-                <BarChart2 className="w-4 h-4" />
+                學生名單
               </button>
               <button
-                onClick={onManageStudents}
-                className={`p-1.5 rounded-lg hover:${theme.surface} transition ${theme.textLight} hover:${theme.text}`}
-                title="管理學生"
+                onClick={() => setSidebarTab('corrections')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-md transition relative
+                  ${sidebarTab === 'corrections' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}
               >
-                <Edit3 className="w-4 h-4" />
+                訂正名單
+                {corrections.length > 0 && sidebarTab !== 'corrections' && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {corrections.length}
+                  </span>
+                )}
               </button>
             </div>
-          </div>
-
-          <div className="px-6 pb-1 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-8" />
-              <span className={`text-[10px] font-bold ${theme.textLight}`}>姓名</span>
-            </div>
-            <div className={`flex items-center gap-1 text-[10px] font-bold ${theme.textLight}`}>
-              <span className="w-9 text-right">當日</span>
-              <span className="w-9 text-right">總分</span>
-              <span className="w-9 text-right">假別</span>
-            </div>
-          </div>
-
-          <div className={`flex-1 overflow-y-auto px-3 pb-4 space-y-1 custom-scrollbar ${fontSizeLevel === 0 ? 'text-sm' :
-            fontSizeLevel === 1 ? 'text-base' :
-              fontSizeLevel === 2 ? 'text-lg' : 'text-xl'
-            }`}>
-            {students.map(student => {
-              const todayScore = student.dailyRecords[today]?.points.reduce((sum, p) => sum + p.value, 0) ?? 0;
-              return (
+            {sidebarTab === 'students' ? (
+              <div className="flex items-center gap-1">
                 <button
-                  key={student.id}
-                  onClick={() => {
-                    onSelectStudent(student.id);
-                    setIsMobileOpen(false);
-                  }}
-                  className={`
-                    w-full text-left p-3 rounded-xl transition-all duration-200 flex items-center justify-between group
-                    ${selectedStudentId === student.id
-                      ? `${theme.surface} shadow-md border ${theme.border} ${theme.text}`
-                      : `hover:${theme.surface} hover:shadow-sm ${theme.textLight} hover:${theme.text}`}
-                  `}
+                  onClick={() => setShowAbsenceStats(true)}
+                  className={`p-1.5 rounded-lg hover:${theme.surface} hover:shadow-md transition ${theme.textLight} hover:${theme.text}`}
+                  title="月請假統計"
                 >
-                  <div className="flex items-center gap-3 overflow-hidden min-w-0">
-                    <div className={`
-                      w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors shrink-0
-                      ${selectedStudentId === student.id ? `${theme.primary} text-white` : `${theme.surfaceAccent} ${theme.textLight}`}
-                    `}>
-                      {student.seatNumber ?? student.order ?? '?'}
-                    </div>
-                    <span className="font-bold truncate">{student.name}</span>
-                  </div>
-                  <div className="flex flex-row items-center gap-1 shrink-0">
-                    <div className="w-9 flex justify-end">
-                      {todayScore !== 0 && (
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${todayScore > 0 ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
-                          {todayScore > 0 ? '+' : ''}{todayScore}
-                        </span>
-                      )}
-                    </div>
-                    <div className="w-9 flex justify-end">
-                      {student.totalScore !== 0 && (
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${student.totalScore > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {student.totalScore > 0 ? '+' : ''}{student.totalScore}
-                        </span>
-                      )}
-                    </div>
-                    <div className="w-9 flex justify-end">
-                      {student.dailyRecords[today]?.absence && (
-                        <span className="text-[10px] font-bold px-1 py-0.5 rounded-md bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                          {student.dailyRecords[today].absence.replace('假', '')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  <BarChart2 className="w-4 h-4" />
                 </button>
-              );
-            })}
+                <button
+                  onClick={onManageStudents}
+                  className={`p-1.5 rounded-lg hover:${theme.surface} hover:shadow-md transition ${theme.textLight} hover:${theme.text}`}
+                  title="管理學生"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsEditingCorrectionPresets(prev => !prev)}
+                className={`p-1.5 rounded-lg hover:${theme.surface} hover:shadow-md transition ${theme.textLight} hover:${theme.text}`}
+                title="管理訂正類型"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            )}
           </div>
+
+          {sidebarTab === 'students' ? (
+            <>
+              <div className="px-6 pb-1 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8" />
+                  <span className={`text-[10px] font-bold ${theme.textLight}`}>姓名</span>
+                </div>
+                <div className={`flex items-center gap-1 text-[10px] font-bold ${theme.textLight}`}>
+                  <span className="w-9 text-right">當日</span>
+                  <span className="w-9 text-right">總分</span>
+                  <span className="w-9 text-right">假別</span>
+                </div>
+              </div>
+
+              <div className={`flex-1 overflow-y-auto px-3 pb-4 space-y-1 custom-scrollbar ${fontSizeLevel === 0 ? 'text-sm' :
+                fontSizeLevel === 1 ? 'text-base' :
+                  fontSizeLevel === 2 ? 'text-lg' : 'text-xl'
+                }`}>
+                {students.map(student => {
+                  const todayScore = student.dailyRecords[today]?.points.reduce((sum, p) => sum + p.value, 0) ?? 0;
+                  return (
+                    <button
+                      key={student.id}
+                      onClick={() => {
+                        onSelectStudent(student.id);
+                        setIsMobileOpen(false);
+                      }}
+                      className={`
+                        w-full text-left p-3 rounded-xl transition-all duration-200 flex items-center justify-between group
+                        ${selectedStudentId === student.id
+                          ? `${theme.surface} shadow-md border ${theme.border} ${theme.text}`
+                          : `hover:${theme.surface} hover:shadow-sm ${theme.textLight} hover:${theme.text}`}
+                      `}
+                    >
+                      <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                        <div className={`
+                          w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors shrink-0
+                          ${selectedStudentId === student.id ? `${theme.primary} text-white` : `${theme.surfaceAccent} ${theme.textLight}`}
+                        `}>
+                          {student.seatNumber ?? student.order ?? '?'}
+                        </div>
+                        <span className="font-bold truncate">{student.name}</span>
+                      </div>
+                      <div className="flex flex-row items-center gap-1 shrink-0">
+                        <div className="w-9 flex justify-end">
+                          {todayScore !== 0 && (
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${todayScore > 0 ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                              {todayScore > 0 ? '+' : ''}{todayScore}
+                            </span>
+                          )}
+                        </div>
+                        <div className="w-9 flex justify-end">
+                          {student.totalScore !== 0 && (
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${student.totalScore > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                              {student.totalScore > 0 ? '+' : ''}{student.totalScore}
+                            </span>
+                          )}
+                        </div>
+                        <div className="w-9 flex justify-end">
+                          {student.dailyRecords[today]?.absence && (
+                            <span className="text-[10px] font-bold px-1 py-0.5 rounded-md bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                              {student.dailyRecords[today].absence.replace('假', '')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              <CorrectionList
+                corrections={corrections}
+                students={students}
+                userUid={userUid}
+                classConfig={classConfig}
+                onConfigUpdate={onConfigUpdate}
+                isEditingPresets={isEditingCorrectionPresets}
+                onEditingPresetsChange={setIsEditingCorrectionPresets}
+              />
+            </div>
+          )}
         </div>
 
         {/* Footer Section */}

@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential, User } from 'firebase/auth';
 import { db } from '../firebase';
-import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule, DailyRecord, AbsenceType, Announcement, PrizeItem } from '../types';
+import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule, DailyRecord, AbsenceType, Announcement, PrizeItem, CorrectionItem } from '../types';
 
 // --- Student CRUD ---
 
@@ -371,4 +371,48 @@ export const subscribeToReadAnnouncements = (
 export const markAnnouncementAsRead = async (userUid: string, announcementId: string) => {
   const ref = doc(db, `users/${userUid}/settings/readAnnouncements`);
   await setDoc(ref, { [announcementId]: true }, { merge: true });
+};
+
+// --- Corrections (訂正追蹤) ---
+
+export const subscribeToCorrections = (
+  userUid: string,
+  callback: (corrections: CorrectionItem[]) => void
+) => {
+  const correctionsRef = collection(db, `users/${userUid}/corrections`);
+  return onSnapshot(correctionsRef, (snapshot) => {
+    const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as CorrectionItem[];
+    list.sort((a, b) => a.createdAt - b.createdAt);
+    callback(list);
+  });
+};
+
+export const addCorrectionBatch = async (
+  userUid: string,
+  studentIds: string[],
+  label: string
+) => {
+  const batch = writeBatch(db);
+  const now = Date.now();
+  for (const studentId of studentIds) {
+    const ref = doc(collection(db, `users/${userUid}/corrections`));
+    batch.set(ref, { studentId, label, createdAt: now });
+  }
+  await batch.commit();
+};
+
+export const deleteCorrection = async (userUid: string, correctionId: string) => {
+  const batch = writeBatch(db);
+  const ref = doc(db, `users/${userUid}/corrections/${correctionId}`);
+  batch.delete(ref);
+  await batch.commit();
+};
+
+export const deleteCorrectionsByLabel = async (userUid: string, label: string, corrections: CorrectionItem[]) => {
+  const toDelete = corrections.filter(c => c.label === label);
+  const batch = writeBatch(db);
+  for (const c of toDelete) {
+    batch.delete(doc(db, `users/${userUid}/corrections/${c.id}`));
+  }
+  await batch.commit();
 };

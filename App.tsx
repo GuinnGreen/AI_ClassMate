@@ -4,12 +4,13 @@ import { Users, Upload, PanelLeftOpen } from 'lucide-react';
 import { auth } from './firebase';
 import { LIGHT_THEME, DARK_THEME } from './constants/theme';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { Student, ClassConfig, Announcement } from './types';
+import { Student, ClassConfig, Announcement, CorrectionItem } from './types';
 import {
   subscribeToStudents,
   subscribeToConfig,
   subscribeToAnnouncements,
   subscribeToReadAnnouncements,
+  subscribeToCorrections,
   updateStudentName,
   updateStudentSeatNumber,
   setStudentScore,
@@ -43,6 +44,7 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>([]);
+  const [corrections, setCorrections] = useState<CorrectionItem[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar-desktop-collapsed') === 'true'; }
     catch { return false; }
@@ -83,7 +85,8 @@ export default function App() {
     const unsubConfig = subscribeToConfig(user.uid, setClassConfig);
     const unsubAnnouncements = subscribeToAnnouncements(setAnnouncements);
     const unsubReadAnnouncements = subscribeToReadAnnouncements(user.uid, setReadAnnouncementIds);
-    return () => { unsubStudents(); unsubConfig(); unsubAnnouncements(); unsubReadAnnouncements(); };
+    const unsubCorrections = subscribeToCorrections(user.uid, setCorrections);
+    return () => { unsubStudents(); unsubConfig(); unsubAnnouncements(); unsubReadAnnouncements(); unsubCorrections(); };
   }, [user?.uid]);
 
   // Nap time auto-dark: keep ref in sync
@@ -240,6 +243,7 @@ export default function App() {
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebarCollapse={() => setIsSidebarCollapsed(prev => !prev)}
             zhuyinMode={classConfig.zhuyinMode ?? false}
+            corrections={corrections}
             announcements={announcements}
             readAnnouncementIds={readAnnouncementIds}
             onZhuyinToggle={async () => {

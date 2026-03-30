@@ -89,6 +89,7 @@ export interface ClassConfig {
   semesterEnd?: string;   // "YYYY-MM-DD"
   prizes?: PrizeItem[];   // 獎品兌換清單
   prizeShopEnabled?: boolean; // 積分商店開關（預設 false）
+  correctionPresets?: string[]; // 自訂訂正類型名稱
 }
 
 export const DEFAULT_POSITIVE_BEHAVIORS: BehaviorButton[] = [
@@ -102,6 +103,18 @@ export const DEFAULT_PRIZES: PrizeItem[] = [
   { id: 'pr1', label: '小貼紙', cost: 5 },
   { id: 'pr2', label: '書籤', cost: 10 },
   { id: 'pr3', label: '鉛筆', cost: 15 },
+];
+
+// 定義訂正追蹤紀錄
+export interface CorrectionItem {
+  id: string;
+  studentId: string;
+  label: string;        // e.g. "國語習作", "數學習作"
+  createdAt: number;
+}
+
+export const DEFAULT_CORRECTION_PRESETS = [
+  '國語習作', '國甲本', '國乙本', '國卷', '數學習作', '數練', '數卷'
 ];
 
 export const DEFAULT_NEGATIVE_BEHAVIORS: BehaviorButton[] = [

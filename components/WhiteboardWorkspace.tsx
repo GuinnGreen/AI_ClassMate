@@ -310,7 +310,7 @@ export const WhiteboardWorkspace = ({
                 className={`p-2 rounded-lg border ${theme.border} ${theme.surface} hover:opacity-80 transition ${theme.textLight}`}
                 title="編輯模板"
               >
-                <LayoutTemplate className="w-4 h-4" />
+                <Settings className="w-4 h-4" />
               </button>
 
               {/* Layout settings (writing mode + lines) */}

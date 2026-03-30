@@ -1,0 +1,258 @@
+import { useState } from 'react';
+import { Plus, CheckCircle2, X, Pencil, Trash2 } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
+import { Student, CorrectionItem, ClassConfig, DEFAULT_CORRECTION_PRESETS } from '../types';
+import { addCorrectionBatch, deleteCorrection, deleteCorrectionsByLabel, updateClassConfig } from '../services/firebaseService';
+
+export function CorrectionList({
+  corrections,
+  students,
+  userUid,
+  classConfig,
+  onConfigUpdate,
+  isEditingPresets,
+  onEditingPresetsChange,
+}: {
+  corrections: CorrectionItem[];
+  students: Student[];
+  userUid: string;
+  classConfig: ClassConfig;
+  onConfigUpdate: (config: ClassConfig) => void;
+  isEditingPresets: boolean;
+  onEditingPresetsChange: (v: boolean) => void;
+}) {
+  const theme = useTheme();
+  const [isAdding, setIsAdding] = useState(false);
+  const [selectedLabel, setSelectedLabel] = useState('');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+  const [newPresetName, setNewPresetName] = useState('');
+
+  const presets = classConfig.correctionPresets ?? DEFAULT_CORRECTION_PRESETS;
+
+  const studentMap = new Map(students.map(s => [s.id, s]));
+
+  // 按 label 分組
+  const grouped = corrections.reduce<Record<string, CorrectionItem[]>>((acc, c) => {
+    if (!acc[c.label]) acc[c.label] = [];
+    acc[c.label].push(c);
+    return acc;
+  }, {});
+
+  const handleDelete = async (correctionId: string) => {
+    await deleteCorrection(userUid, correctionId);
+  };
+
+  const handleDeleteGroup = async (label: string) => {
+    await deleteCorrectionsByLabel(userUid, label, corrections);
+  };
+
+  const handleAdd = async () => {
+    if (!selectedLabel || selectedStudentIds.size === 0) return;
+    await addCorrectionBatch(userUid, Array.from(selectedStudentIds), selectedLabel);
+    setIsAdding(false);
+    setSelectedLabel('');
+    setSelectedStudentIds(new Set());
+  };
+
+  const toggleStudent = (id: string) => {
+    setSelectedStudentIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleAddPreset = async () => {
+    const name = newPresetName.trim();
+    if (!name || presets.includes(name)) return;
+    const newPresets = [...presets, name];
+    const newConfig = { ...classConfig, correctionPresets: newPresets };
+    onConfigUpdate(newConfig);
+    await updateClassConfig(userUid, newConfig);
+    setNewPresetName('');
+  };
+
+  const handleDeletePreset = async (preset: string) => {
+    const newPresets = presets.filter(p => p !== preset);
+    const newConfig = { ...classConfig, correctionPresets: newPresets };
+    onConfigUpdate(newConfig);
+    await updateClassConfig(userUid, newConfig);
+    if (selectedLabel === preset) setSelectedLabel('');
+  };
+
+  const getSeatNumber = (studentId: string) => {
+    const s = studentMap.get(studentId);
+    return s?.seatNumber ?? s?.order ?? 0;
+  };
+
+  if (isEditingPresets) {
+    return (
+      <div className="px-3 pb-4 space-y-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className={`text-xs font-bold ${theme.text}`}>管理訂正類型</span>
+          <button onClick={() => onEditingPresetsChange(false)} className={`px-2.5 py-1 rounded-lg text-xs font-bold ${theme.primary} text-white hover:opacity-90 transition`}>
+            儲存
+          </button>
+        </div>
+        <div className="space-y-1.5">
+          {presets.map(preset => (
+            <div key={preset} className={`flex items-center justify-between p-2.5 rounded-xl ${theme.surfaceAlt}`}>
+              <span className={`text-sm font-bold ${theme.text}`}>{preset}</span>
+              <button
+                onClick={() => handleDeletePreset(preset)}
+                className="p-1 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={newPresetName}
+            onChange={(e) => setNewPresetName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddPreset()}
+            placeholder="新增類型名稱..."
+            className={`flex-1 px-3 py-2 text-sm rounded-xl border ${theme.border} ${theme.inputBg} ${theme.text} outline-none focus:ring-2 ${theme.focusRing}`}
+          />
+          <button
+            onClick={handleAddPreset}
+            disabled={!newPresetName.trim()}
+            className={`px-3 py-2 rounded-xl text-sm font-bold ${theme.primary} text-white disabled:opacity-40 transition`}
+          >
+            新增
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAdding) {
+    return (
+      <div className="px-3 pb-4 space-y-3">
+        <div className="flex items-center justify-between mb-1">
+          <span className={`text-xs font-bold ${theme.text}`}>新增訂正</span>
+          <button onClick={() => { setIsAdding(false); setSelectedLabel(''); setSelectedStudentIds(new Set()); }} className={`p-1 rounded-lg ${theme.textLight} hover:${theme.text} transition`}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* 選擇類型 */}
+        <div>
+          <span className={`text-[10px] font-bold ${theme.textLight} mb-1.5 block`}>選擇類型</span>
+          <div className="flex flex-wrap gap-1.5">
+            {presets.map(preset => (
+              <button
+                key={preset}
+                onClick={() => setSelectedLabel(preset)}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all
+                  ${selectedLabel === preset
+                    ? `${theme.primary} text-white shadow-md`
+                    : `${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} hover:shadow-md`
+                  }`}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 選擇學生 */}
+        {selectedLabel && (
+          <div>
+            <span className={`text-[10px] font-bold ${theme.textLight} mb-1.5 block`}>選擇學生</span>
+            <div className="grid grid-cols-4 gap-1.5">
+              {students.map(s => {
+                const seat = s.seatNumber ?? s.order ?? '?';
+                const isSelected = selectedStudentIds.has(s.id);
+                // 已經有此標籤的訂正中的學生
+                const alreadyHas = corrections.some(c => c.label === selectedLabel && c.studentId === s.id);
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => !alreadyHas && toggleStudent(s.id)}
+                    disabled={alreadyHas}
+                    className={`p-1.5 rounded-lg text-xs font-bold transition-all text-center
+                      ${alreadyHas
+                        ? `${theme.surfaceAlt} ${theme.textLight} opacity-40 cursor-not-allowed`
+                        : isSelected
+                          ? `${theme.primary} text-white shadow-md`
+                          : `${theme.surfaceAlt} ${theme.text} hover:shadow-md`
+                      }`}
+                    title={alreadyHas ? `${s.name} 已在訂正名單中` : s.name}
+                  >
+                    {seat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 確認按鈕 */}
+        <button
+          onClick={handleAdd}
+          disabled={!selectedLabel || selectedStudentIds.size === 0}
+          className={`w-full py-2.5 rounded-xl text-sm font-bold ${theme.primary} text-white disabled:opacity-40 transition hover:opacity-90`}
+        >
+          新增 {selectedStudentIds.size > 0 ? `(${selectedStudentIds.size} 人)` : ''}
+        </button>
+      </div>
+    );
+  }
+
+  // 主列表視圖
+  return (
+    <div className="px-3 pb-4 space-y-2">
+      {Object.keys(grouped).length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 opacity-60">
+          <Pencil className={`w-10 h-10 mb-3 ${theme.textLight}`} />
+          <p className={`text-sm ${theme.textLight}`}>目前沒有待訂正項目</p>
+        </div>
+      ) : (
+        Object.entries(grouped).map(([label, items]) => {
+          const sorted = [...items].sort((a, b) => getSeatNumber(a.studentId) - getSeatNumber(b.studentId));
+          return (
+            <div key={label} className={`p-3 rounded-xl ${theme.surfaceAlt} space-y-2`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-xs font-bold ${theme.text}`}>{label}</span>
+                <button
+                  onClick={() => handleDeleteGroup(label)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold ${theme.textLight} hover:text-green-600 hover:bg-green-50 transition`}
+                  title="全部完成"
+                >
+                  <CheckCircle2 className="w-3 h-3" /> 全部完成
+                </button>
+              </div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {sorted.map(item => {
+                  const seat = getSeatNumber(item.studentId);
+                  const student = studentMap.get(item.studentId);
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleDelete(item.id)}
+                      className={`w-full aspect-square rounded-full flex items-center justify-center text-xl font-bold ${theme.surfaceAccent} ${theme.text} hover:bg-green-100 hover:text-green-600 hover:shadow-md transition-all`}
+                      title={`${student?.name ?? '?'} — 點擊完成`}
+                    >
+                      {seat}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })
+      )}
+
+      {/* 底部按鈕 */}
+      <button
+        onClick={() => setIsAdding(true)}
+        className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold ${theme.surfaceAlt} ${theme.text} hover:shadow-md transition`}
+      >
+        <Plus className="w-4 h-4" /> 新增訂正
+      </button>
+    </div>
+  );
+}
