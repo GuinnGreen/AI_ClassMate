@@ -522,7 +522,7 @@ export const StudentDetailWorkspace = ({
                 ) : (
                   <button
                     onClick={() => setIsAbsenceExpanded(true)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all ${theme.textLight} hover:${theme.text}`}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all ${theme.textLight} hover:${theme.text} hover:shadow-md`}
                   >
                     <BookX className="w-4 h-4" />
                     <span>假</span>
@@ -538,7 +538,7 @@ export const StudentDetailWorkspace = ({
                       className={`px-2 py-1.5 lg:px-2.5 text-xs font-bold rounded-lg transition-all animate-fade-in
                         ${todayAbsence === type
                           ? `${theme.primary} text-white shadow`
-                          : `${theme.textLight} hover:${theme.text}`
+                          : `${theme.textLight} hover:${theme.text} hover:shadow-md`
                         }`}
                     >
                       <span className="lg:hidden">{type[0]}</span>
@@ -557,8 +557,8 @@ export const StudentDetailWorkspace = ({
               <span className="hidden lg:inline">輔導紀錄</span>
             </button>
             <div className={`flex ${theme.surfaceAlt} p-1.5 rounded-xl`}>
-              <button onClick={() => setMode('daily')} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'daily' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><ClipboardList className="w-4 h-4 lg:hidden" /><span className="hidden lg:inline">日常紀錄</span></button>
-              <button onClick={() => { if (mode !== 'ai') { setPendingAction('ai'); setShowPasswordModal(true); } }} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text}`}`}><Sparkles className="w-4 h-4" /><span className="hidden lg:inline">AI 評語</span></button>
+              <button onClick={() => setMode('daily')} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'daily' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text} hover:shadow-md`}`}><ClipboardList className="w-4 h-4 lg:hidden" /><span className="hidden lg:inline">日常紀錄</span></button>
+              <button onClick={() => { if (mode !== 'ai') { setPendingAction('ai'); setShowPasswordModal(true); } }} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text} hover:shadow-md`}`}><Sparkles className="w-4 h-4" /><span className="hidden lg:inline">AI 評語</span></button>
             </div>
             <a
               href="https://ai-classmate.com/guide/"
@@ -784,7 +784,7 @@ export const StudentDetailWorkspace = ({
                           className={`flex-1 px-2 py-2 rounded-xl text-sm font-bold transition text-center
                             ${activeEvaluationTab === idx
                               ? `${theme.primary} text-white shadow-md`
-                              : `${theme.surfaceAlt} ${theme.textLight} hover:${theme.text}`
+                              : `${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} hover:shadow-md`
                             }
                           `}
                         >
@@ -808,7 +808,7 @@ export const StudentDetailWorkspace = ({
                                 className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border-2 w-full text-center
                                     ${student.tags.includes(tag)
                                     ? `${theme.primary} border-${theme.primary} text-white shadow-md transform scale-105`
-                                    : `border-transparent ${theme.surfaceAccent} ${theme.text} hover:border-${theme.primary}`
+                                    : `border-transparent ${theme.surfaceAccent} ${theme.text} hover:border-${theme.primary} hover:shadow-md`
                                   }
                                   `}
                               >
@@ -830,7 +830,7 @@ export const StudentDetailWorkspace = ({
                                 className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border-2 w-full text-center
                                     ${student.tags.includes(tag)
                                     ? `${theme.accentNegative} border-${theme.accentNegative} text-white shadow-md transform scale-105`
-                                    : `border-transparent ${theme.surfaceAccent} ${theme.text} hover:border-${theme.accentNegative}`
+                                    : `border-transparent ${theme.surfaceAccent} ${theme.text} hover:border-${theme.accentNegative} hover:shadow-md`
                                   }
                                   `}
                               >
@@ -844,7 +844,7 @@ export const StudentDetailWorkspace = ({
                     <h3 className={`text-sm font-bold ${theme.text} mb-3 flex items-center gap-2`}><AlignLeft className="w-4 h-4" /> 生成字數設定</h3>
                     <div className={`grid grid-cols-4 gap-2 p-1 ${theme.surfaceAlt} rounded-xl mb-6`}>
                       {([50, 100, 150, 200] as const).map((len) => (
-                        <button key={len} onClick={() => setCommentLength(len)} className={`py-2 text-sm font-bold rounded-lg transition ${commentLength === len ? `${theme.surface} ${theme.text} shadow-sm border ${theme.border}` : `${theme.textLight} hover:${theme.text}`}`}>
+                        <button key={len} onClick={() => setCommentLength(len)} className={`py-2 text-sm font-bold rounded-lg transition ${commentLength === len ? `${theme.surface} ${theme.text} shadow-sm border ${theme.border}` : `${theme.textLight} hover:${theme.text} hover:shadow-md`}`}>
                           {len}字
                         </button>
                       ))}
