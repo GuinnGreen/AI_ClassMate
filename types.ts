@@ -90,6 +90,7 @@ export interface ClassConfig {
   prizes?: PrizeItem[];   // 獎品兌換清單
   prizeShopEnabled?: boolean; // 積分商店開關（預設 false）
   correctionPresets?: string[]; // 自訂訂正類型名稱
+  correctionColumns?: 3 | 4 | 5; // 訂正列表每行座號數（預設 4）
 }
 
 export const DEFAULT_POSITIVE_BEHAVIORS: BehaviorButton[] = [

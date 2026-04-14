@@ -24,10 +24,14 @@ export function CorrectionList({
   const theme = useTheme();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState('');
+  const [labelLocked, setLabelLocked] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
   const [newPresetName, setNewPresetName] = useState('');
 
   const presets = classConfig.correctionPresets ?? DEFAULT_CORRECTION_PRESETS;
+  const cols = classConfig.correctionColumns ?? 4;
+  const colsClass = cols === 3 ? 'grid-cols-3' : cols === 5 ? 'grid-cols-5' : 'grid-cols-4';
+  const seatTextClass = cols === 3 ? 'text-2xl' : cols === 5 ? 'text-lg' : 'text-xl';
 
   const studentMap = new Map(students.map(s => [s.id, s]));
 
@@ -51,6 +55,7 @@ export function CorrectionList({
     await addCorrectionBatch(userUid, Array.from(selectedStudentIds), selectedLabel);
     setIsAdding(false);
     setSelectedLabel('');
+    setLabelLocked(false);
     setSelectedStudentIds(new Set());
   };
 
@@ -124,6 +129,33 @@ export function CorrectionList({
             新增
           </button>
         </div>
+
+        {/* 每行顯示座號數 */}
+        <div className="pt-2">
+          <span className={`text-xs font-bold ${theme.text} mb-2 block`}>每行顯示座號數</span>
+          <div className="flex gap-2">
+            {([3, 4, 5] as const).map(n => {
+              const active = cols === n;
+              return (
+                <button
+                  key={n}
+                  onClick={async () => {
+                    const newConfig = { ...classConfig, correctionColumns: n };
+                    onConfigUpdate(newConfig);
+                    await updateClassConfig(userUid, newConfig);
+                  }}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all
+                    ${active
+                      ? `${theme.primary} text-white shadow-md`
+                      : `${theme.surfaceAlt} ${theme.text} hover:shadow-md`
+                    }`}
+                >
+                  {n}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     );
   }
@@ -132,13 +164,14 @@ export function CorrectionList({
     return (
       <div className="px-3 pb-4 space-y-3">
         <div className="flex items-center justify-between mb-1">
-          <span className={`text-xs font-bold ${theme.text}`}>新增訂正</span>
-          <button onClick={() => { setIsAdding(false); setSelectedLabel(''); setSelectedStudentIds(new Set()); }} className={`p-1 rounded-lg ${theme.textLight} hover:${theme.text} transition`}>
+          <span className={`text-xs font-bold ${theme.text}`}>{labelLocked ? `新增訂正 — ${selectedLabel}` : '新增訂正'}</span>
+          <button onClick={() => { setIsAdding(false); setSelectedLabel(''); setLabelLocked(false); setSelectedStudentIds(new Set()); }} className={`p-1 rounded-lg ${theme.textLight} hover:${theme.text} transition`}>
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* 選擇類型 */}
+        {!labelLocked && (
         <div>
           <span className={`text-[10px] font-bold ${theme.textLight} mb-1.5 block`}>選擇類型</span>
           <div className="flex flex-wrap gap-1.5">
@@ -157,6 +190,7 @@ export function CorrectionList({
             ))}
           </div>
         </div>
+        )}
 
         {/* 選擇學生 */}
         {selectedLabel && (
@@ -216,16 +250,30 @@ export function CorrectionList({
           return (
             <div key={label} className={`p-3 rounded-xl ${theme.surfaceAlt} space-y-2`}>
               <div className="flex items-center justify-between">
-                <span className={`text-xs font-bold ${theme.text}`}>{label}</span>
-                <button
-                  onClick={() => handleDeleteGroup(label)}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold ${theme.textLight} hover:text-green-600 hover:bg-green-50 transition`}
-                  title="全部完成"
-                >
-                  <CheckCircle2 className="w-3 h-3" /> 全部完成
-                </button>
+                <span className={`text-base font-bold ${theme.text}`}>{label}</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setSelectedLabel(label);
+                      setLabelLocked(true);
+                      setSelectedStudentIds(new Set());
+                      setIsAdding(true);
+                    }}
+                    className={`flex items-center justify-center p-1.5 rounded-lg ${theme.textLight} hover:text-blue-600 hover:bg-blue-50 transition`}
+                    title="新增學生到此類型"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteGroup(label)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold ${theme.textLight} hover:text-green-600 hover:bg-green-50 transition`}
+                    title="全部完成"
+                  >
+                    <CheckCircle2 className="w-3 h-3" /> 全部完成
+                  </button>
+                </div>
               </div>
-              <div className="grid grid-cols-5 gap-1.5">
+              <div className={`grid ${colsClass} gap-1.5`}>
                 {sorted.map(item => {
                   const seat = getSeatNumber(item.studentId);
                   const student = studentMap.get(item.studentId);
@@ -233,7 +281,7 @@ export function CorrectionList({
                     <button
                       key={item.id}
                       onClick={() => handleDelete(item.id)}
-                      className={`w-full aspect-square rounded-full flex items-center justify-center text-xl font-bold ${theme.surfaceAccent} ${theme.text} hover:bg-green-100 hover:text-green-600 hover:shadow-md transition-all`}
+                      className={`w-full aspect-square rounded-full flex items-center justify-center ${seatTextClass} font-bold ${theme.surfaceAccent} ${theme.text} hover:bg-green-100 hover:text-green-600 hover:shadow-md transition-all`}
                       title={`${student?.name ?? '?'} — 點擊完成`}
                     >
                       {seat}
