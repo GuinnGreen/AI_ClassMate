@@ -26,16 +26,21 @@ const ROW_CONFIG = [
   { label: '第五節', defaultTime: '13:30-14:10', isLunch: false },
   { label: '第六節', defaultTime: '14:20-15:00', isLunch: false },
   { label: '第七節', defaultTime: '15:20-16:00', isLunch: false },
+  { label: '第八節', defaultTime: '16:10-16:50', isLunch: false },
 ];
 
 export const ManualScheduleEditor = ({
   initialSchedule,
   onSave,
   userUid,
+  hasEighthPeriod,
+  onToggleEighthPeriod,
 }: {
   initialSchedule?: DaySchedule[];
   onSave: (schedule: DaySchedule[]) => void;
   userUid: string;
+  hasEighthPeriod: boolean;
+  onToggleEighthPeriod: (enabled: boolean) => void;
 }) => {
   const theme = useTheme();
   const { canGenerate, cooldownRemaining, isLimitReached, dailyUsageCount, dailyLimit, recordGeneration } = useAiRateLimit({ userUid });
@@ -45,7 +50,10 @@ export const ManualScheduleEditor = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const newRows: EditorRow[] = ROW_CONFIG.map((cfg, idx) => ({
+    const activeConfig = hasEighthPeriod
+      ? ROW_CONFIG
+      : ROW_CONFIG.filter(cfg => cfg.label !== '第八節');
+    const newRows: EditorRow[] = activeConfig.map((cfg, idx) => ({
       id: `row-${idx}`,
       label: cfg.label,
       periodName: cfg.defaultTime,
@@ -81,7 +89,7 @@ export const ManualScheduleEditor = ({
     }
 
     setRows(newRows);
-  }, [initialSchedule]);
+  }, [initialSchedule, hasEighthPeriod]);
 
   const handleSubjectChange = (rowIdx: number, dayIdx: number, val: string) => {
     const newRows = [...rows];
@@ -98,10 +106,10 @@ export const ManualScheduleEditor = ({
   const normalizePeriodName = (name: string): string => {
     const map: Record<string, string> = {
       '1': '第一節', '2': '第二節', '3': '第三節', '4': '第四節',
-      '5': '第五節', '6': '第六節', '7': '第七節',
+      '5': '第五節', '6': '第六節', '7': '第七節', '8': '第八節',
     };
     const digit = name.match(/第(\d)節/)?.[1];
-    if (digit) return `第${'一二三四五六七'[+digit - 1]}節`;
+    if (digit) return `第${'一二三四五六七八'[+digit - 1]}節`;
     return map[name.trim()] ?? name;
   };
 
@@ -196,6 +204,14 @@ export const ManualScheduleEditor = ({
           subject: subject || ""
         });
       });
+
+      // 第八節關閉時，保留 initialSchedule 中既有的第八節資料，避免遺失
+      if (!hasEighthPeriod && initialSchedule) {
+        const prevDay = initialSchedule.find(d => d.dayOfWeek === day);
+        const prevEighth = prevDay?.periods.find(p => p.periodName.includes('第八節'));
+        if (prevEighth) periods.push(prevEighth);
+      }
+
       schedule.push({ dayOfWeek: day, periods });
     }
     onSave(schedule);
@@ -224,6 +240,19 @@ export const ManualScheduleEditor = ({
         {importError && (
           <span className="text-red-500 text-sm">{importError}</span>
         )}
+
+        <label
+          className={`ml-auto flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer font-semibold text-sm border ${theme.border} ${hasEighthPeriod ? theme.surfaceAccent : theme.surfaceAlt} ${theme.text} hover:opacity-80 transition select-none`}
+          title="國中適用，啟用後會多一列第八節"
+        >
+          <input
+            type="checkbox"
+            checked={hasEighthPeriod}
+            onChange={(e) => onToggleEighthPeriod(e.target.checked)}
+            className="w-4 h-4 accent-current cursor-pointer"
+          />
+          🏫 啟用第八節（國中）
+        </label>
       </div>
 
       <div className={`overflow-x-auto border ${theme.border} rounded-xl`}>

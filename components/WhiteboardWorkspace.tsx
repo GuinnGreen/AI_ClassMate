@@ -522,6 +522,12 @@ export const WhiteboardWorkspace = ({
         <ManualScheduleEditor
           initialSchedule={config.weeklySchedule}
           userUid={userUid}
+          hasEighthPeriod={config.hasEighthPeriod ?? false}
+          onToggleEighthPeriod={async (enabled) => {
+            const newConfig = { ...config, hasEighthPeriod: enabled };
+            if (onConfigUpdate) onConfigUpdate(newConfig);
+            await updateClassConfig(userUid, newConfig);
+          }}
           onSave={async (newSchedule) => {
             const newConfig = { ...config, weeklySchedule: newSchedule };
             if (onConfigUpdate) onConfigUpdate(newConfig);
