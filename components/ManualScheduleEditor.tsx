@@ -62,12 +62,12 @@ export const ManualScheduleEditor = ({
     }));
 
     if (initialSchedule && initialSchedule.length > 0) {
-      const wedAfternoonLabels = ['第五節', '第六節', '第七節'];
+      const wedAfternoonLabels = hasEighthPeriod ? [] : ['第五節', '第六節', '第七節'];
       newRows.forEach((row) => {
         let foundTime = "";
 
         for (let day = 1; day <= 5; day++) {
-          // 週三下午不載入
+          // 週三下午不載入（啟用第八節時取消此限制）
           if (day === 3 && wedAfternoonLabels.includes(row.label)) continue;
           const dayData = initialSchedule.find(d => d.dayOfWeek === day);
           if (dayData) {
@@ -187,7 +187,7 @@ export const ManualScheduleEditor = ({
 
   const handleSave = () => {
     const schedule: DaySchedule[] = [];
-    const wedAfternoonLabels = ['第五節', '第六節', '第七節'];
+    const wedAfternoonLabels = hasEighthPeriod ? [] : ['第五節', '第六節', '第七節'];
     for (let day = 1; day <= 5; day++) {
       const periods: Period[] = [];
       rows.forEach(row => {
@@ -297,7 +297,7 @@ export const ManualScheduleEditor = ({
                   </td>
                 ) : (
                   [0, 1, 2, 3, 4].map(day => {
-                    const isWedAfternoon = day === 2 && ['第五節', '第六節', '第七節'].includes(row.label);
+                    const isWedAfternoon = day === 2 && !hasEighthPeriod && ['第五節', '第六節', '第七節'].includes(row.label);
                     return (
                       <td key={day} className={`p-2 border-l ${theme.border} ${isWedAfternoon ? 'bg-gray-100 dark:bg-gray-800/50' : ''}`}>
                         {isWedAfternoon ? (
