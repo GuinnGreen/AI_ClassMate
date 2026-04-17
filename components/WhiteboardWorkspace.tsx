@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { ClipboardList, Clock, Settings, Calendar as CalendarIcon, Minus, Plus, LayoutTemplate, Eye, EyeOff, HelpCircle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useToast } from '../contexts/ToastContext';
 import { getCurrentTime } from '../utils/date';
 import { isCurrentPeriod, getPeriodParts } from '../utils/schedule';
 import { updateClassConfig } from '../services/firebaseService';
@@ -8,7 +9,6 @@ import { getCurrentSemester } from '../utils/semester';
 import { Modal } from './ui/Modal';
 import { ManualScheduleEditor } from './ManualScheduleEditor';
 import { BoardTemplateEditor } from './BoardTemplateEditor';
-import { LazyCat } from './LazyCat';
 import { ClassConfig, BoardWritingMode } from '../types';
 
 const clockSizeMap = [
@@ -59,6 +59,7 @@ export const WhiteboardWorkspace = ({
   setClockSizeLevel?: (n: number) => void;
 }) => {
   const theme = useTheme();
+  const { showError } = useToast();
   const cs = clockSizeMap[clockSizeLevel];
   const [boardContent, setBoardContent] = useState(config.class_board || '');
   const [isEditing, setIsEditing] = useState(false);
@@ -78,17 +79,19 @@ export const WhiteboardWorkspace = ({
 
   const activeSituation = config.activeBoardSituation ?? null;
 
-  const setWritingMode = async (mode: BoardWritingMode) => {
-    const newConfig = { ...config, boardWritingMode: mode };
+  const persistConfig = async (newConfig: ClassConfig, errorLabel: string) => {
+    const prev = config;
     if (onConfigUpdate) onConfigUpdate(newConfig);
-    await updateClassConfig(userUid, newConfig);
+    try { await updateClassConfig(userUid, newConfig); }
+    catch (err) {
+      console.error(`[${errorLabel}]`, err);
+      if (onConfigUpdate) onConfigUpdate(prev);
+      showError(`${errorLabel}儲存失敗`);
+    }
   };
 
-  const toggleLines = async () => {
-    const newConfig = { ...config, showBoardLines: !showBoardLines };
-    if (onConfigUpdate) onConfigUpdate(newConfig);
-    await updateClassConfig(userUid, newConfig);
-  };
+  const setWritingMode = (mode: BoardWritingMode) => persistConfig({ ...config, boardWritingMode: mode }, '書寫方向');
+  const toggleLines = () => persistConfig({ ...config, showBoardLines: !showBoardLines }, '底線顯示');
 
   useEffect(() => {
     if (!showLayoutMenu) return;
@@ -103,33 +106,20 @@ export const WhiteboardWorkspace = ({
 
   const layoutLabel = writingMode === 'horizontal-tb' ? '橫' : writingMode === 'vertical-lr' ? '直→' : '直←';
 
-  const setActiveSituation = async (id: string | null) => {
-    const newConfig = { ...config, activeBoardSituation: id };
-    if (onConfigUpdate) onConfigUpdate(newConfig);
-    await updateClassConfig(userUid, newConfig);
-  };
+  const setActiveSituation = (id: string | null) => persistConfig({ ...config, activeBoardSituation: id }, '情境模板切換');
+  const toggleClock = () => persistConfig({ ...config, showClock: !showClock }, '時鐘顯示');
 
-  const toggleClock = async () => {
-    const newConfig = { ...config, showClock: !showClock };
-    if (onConfigUpdate) onConfigUpdate(newConfig);
-    await updateClassConfig(userUid, newConfig);
-  };
-
-  const setBoardFontSize = async (level: number) => {
+  const setBoardFontSize = (level: number) => {
     const clamped = Math.max(0, Math.min(boardFontSizeMap.length - 1, level));
-    const newConfig = { ...config, boardFontSizeLevel: clamped };
-    if (onConfigUpdate) onConfigUpdate(newConfig);
-    await updateClassConfig(userUid, newConfig);
+    return persistConfig({ ...config, boardFontSizeLevel: clamped }, '公告欄字體');
   };
 
   const scheduleFontLevel = config.scheduleFontSizeLevel ?? 1;
   const sf = scheduleFontSizeMap[scheduleFontLevel];
 
-  const setScheduleFontSize = async (level: number) => {
+  const setScheduleFontSize = (level: number) => {
     const clamped = Math.max(0, Math.min(scheduleFontSizeMap.length - 1, level));
-    const newConfig = { ...config, scheduleFontSizeLevel: clamped };
-    if (onConfigUpdate) onConfigUpdate(newConfig);
-    await updateClassConfig(userUid, newConfig);
+    return persistConfig({ ...config, scheduleFontSizeLevel: clamped }, '課表字體');
   };
 
   const writingModeOptions: { mode: BoardWritingMode; label: string }[] = [
@@ -165,8 +155,13 @@ export const WhiteboardWorkspace = ({
   const saveBoard = async () => {
     const newConfig = { ...config, class_board: boardContent };
     if (onConfigUpdate) onConfigUpdate(newConfig);
-    await updateClassConfig(userUid, newConfig);
-    setIsEditing(false);
+    try {
+      await updateClassConfig(userUid, newConfig);
+      setIsEditing(false);
+    } catch (err) {
+      console.error('[saveBoard]', err);
+      showError('公告欄儲存失敗，請重試');
+    }
   };
 
   const displaySchedule = useMemo(() => {

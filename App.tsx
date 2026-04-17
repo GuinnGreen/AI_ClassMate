@@ -222,7 +222,8 @@ function AppInner() {
 
   const handleUpdateStudentSeatNumber = async (id: string, seatNumber: number) => {
     if (!user) return;
-    await updateStudentSeatNumber(user.uid, id, seatNumber);
+    try { await updateStudentSeatNumber(user.uid, id, seatNumber); }
+    catch (err) { console.error('[handleUpdateStudentSeatNumber]', err); showError('座號更新失敗'); }
   };
 
   const handleUpdateStudentScore = async (id: string, newScore: number) => {

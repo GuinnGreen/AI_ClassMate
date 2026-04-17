@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Trash2, Save, Copy } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useToast } from '../contexts/ToastContext';
 import { updateClassConfig } from '../services/firebaseService';
 import { ClassConfig, BoardSituationTemplate } from '../types';
 
@@ -24,6 +25,7 @@ export const BoardTemplateEditor = ({
   onClose: () => void;
 }) => {
   const theme = useTheme();
+  const { showError, showSuccess } = useToast();
   const [activeTab, setActiveTab] = useState<'daily' | 'situation'>('daily');
 
   // --- Tab 1: 每日固定 ---
@@ -48,8 +50,11 @@ export const BoardTemplateEditor = ({
   const handleDailySave = async () => {
     const newConfig: ClassConfig = { ...config, boardDailyTemplates: dailyTemplates };
     onConfigUpdate?.(newConfig);
-    await updateClassConfig(userUid, newConfig);
-    onClose();
+    try {
+      await updateClassConfig(userUid, newConfig);
+      showSuccess('每日模板已儲存');
+      onClose();
+    } catch (err) { console.error('[handleDailySave]', err); showError('每日模板儲存失敗'); }
   };
 
   // --- Tab 2: 情境模板 ---
@@ -84,8 +89,11 @@ export const BoardTemplateEditor = ({
   const handleSituationSave = async () => {
     const newConfig: ClassConfig = { ...config, boardSituationTemplates: situations };
     onConfigUpdate?.(newConfig);
-    await updateClassConfig(userUid, newConfig);
-    onClose();
+    try {
+      await updateClassConfig(userUid, newConfig);
+      showSuccess('情境模板已儲存');
+      onClose();
+    } catch (err) { console.error('[handleSituationSave]', err); showError('情境模板儲存失敗'); }
   };
 
   return (

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, CheckCircle2, X, Pencil, Trash2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useToast } from '../contexts/ToastContext';
 import { Student, CorrectionItem, ClassConfig, DEFAULT_CORRECTION_PRESETS } from '../types';
 import { addCorrectionBatch, deleteCorrection, deleteCorrectionsByLabel, updateClassConfig } from '../services/firebaseService';
 
@@ -22,6 +23,7 @@ export function CorrectionList({
   onEditingPresetsChange: (v: boolean) => void;
 }) {
   const theme = useTheme();
+  const { showError, showSuccess } = useToast();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState('');
   const [labelLocked, setLabelLocked] = useState(false);
@@ -43,20 +45,26 @@ export function CorrectionList({
   }, {});
 
   const handleDelete = async (correctionId: string) => {
-    await deleteCorrection(userUid, correctionId);
+    try { await deleteCorrection(userUid, correctionId); }
+    catch (err) { console.error('[handleDelete]', err); showError('刪除訂正失敗'); }
   };
 
   const handleDeleteGroup = async (label: string) => {
-    await deleteCorrectionsByLabel(userUid, label, corrections);
+    try { await deleteCorrectionsByLabel(userUid, label, corrections); }
+    catch (err) { console.error('[handleDeleteGroup]', err); showError('刪除訂正群組失敗'); }
   };
 
   const handleAdd = async () => {
     if (!selectedLabel || selectedStudentIds.size === 0) return;
-    await addCorrectionBatch(userUid, Array.from(selectedStudentIds), selectedLabel);
-    setIsAdding(false);
-    setSelectedLabel('');
-    setLabelLocked(false);
-    setSelectedStudentIds(new Set());
+    const count = selectedStudentIds.size;
+    try {
+      await addCorrectionBatch(userUid, Array.from(selectedStudentIds), selectedLabel);
+      setIsAdding(false);
+      setSelectedLabel('');
+      setLabelLocked(false);
+      setSelectedStudentIds(new Set());
+      showSuccess(`已新增 ${count} 筆訂正`);
+    } catch (err) { console.error('[handleAdd]', err); showError('新增訂正失敗'); }
   };
 
   const toggleStudent = (id: string) => {
@@ -72,18 +80,32 @@ export function CorrectionList({
     const name = newPresetName.trim();
     if (!name || presets.includes(name)) return;
     const newPresets = [...presets, name];
+    const prev = classConfig;
     const newConfig = { ...classConfig, correctionPresets: newPresets };
     onConfigUpdate(newConfig);
-    await updateClassConfig(userUid, newConfig);
-    setNewPresetName('');
+    try {
+      await updateClassConfig(userUid, newConfig);
+      setNewPresetName('');
+    } catch (err) {
+      console.error('[handleAddPreset]', err);
+      onConfigUpdate(prev);
+      showError('新增預設類型失敗');
+    }
   };
 
   const handleDeletePreset = async (preset: string) => {
     const newPresets = presets.filter(p => p !== preset);
+    const prev = classConfig;
     const newConfig = { ...classConfig, correctionPresets: newPresets };
     onConfigUpdate(newConfig);
-    await updateClassConfig(userUid, newConfig);
-    if (selectedLabel === preset) setSelectedLabel('');
+    try {
+      await updateClassConfig(userUid, newConfig);
+      if (selectedLabel === preset) setSelectedLabel('');
+    } catch (err) {
+      console.error('[handleDeletePreset]', err);
+      onConfigUpdate(prev);
+      showError('刪除預設類型失敗');
+    }
   };
 
   const getSeatNumber = (studentId: string) => {
