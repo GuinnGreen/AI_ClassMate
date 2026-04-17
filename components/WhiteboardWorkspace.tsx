@@ -167,8 +167,11 @@ export const WhiteboardWorkspace = ({
   const displaySchedule = useMemo(() => {
     const tomorrowDayOfWeek = currentTime.dayOfWeek === 6 ? 0 : currentTime.dayOfWeek + 1;
     const targetDay = showTomorrow ? tomorrowDayOfWeek : currentTime.dayOfWeek;
-    return config.weeklySchedule?.find(s => s.dayOfWeek === targetDay);
-  }, [config.weeklySchedule, currentTime.dayOfWeek, showTomorrow]);
+    const day = config.weeklySchedule?.find(s => s.dayOfWeek === targetDay);
+    if (!day) return undefined;
+    if (config.hasEighthPeriod) return day;
+    return { ...day, periods: day.periods.filter(p => !p.periodName.includes('第八節')) };
+  }, [config.weeklySchedule, currentTime.dayOfWeek, showTomorrow, config.hasEighthPeriod]);
 
   // Decide which template content to show in the top section
   const templateContent = useMemo(() => {
