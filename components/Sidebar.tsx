@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import {
   Users, LogOut, School, Edit3, Moon, Sun,
   Plus, Minus, Type, Sunset, BarChart2, PanelLeftClose, Languages, Bell, Archive, Settings
@@ -11,8 +11,8 @@ import { Student, ClassConfig, Announcement, CorrectionItem } from '../types';
 import { formatDate } from '../utils/date';
 import { archiveSemester } from '../services/firebaseService';
 import { getCurrentSemester } from '../utils/semester';
-import { AbsenceStatsModal } from './AbsenceStatsModal';
-import { NotificationPanel } from './NotificationPanel';
+const AbsenceStatsModal = lazy(() => import('./AbsenceStatsModal').then(m => ({ default: m.AbsenceStatsModal })));
+const NotificationPanel = lazy(() => import('./NotificationPanel').then(m => ({ default: m.NotificationPanel })));
 import { CorrectionList } from './CorrectionList';
 
 export const Sidebar = ({
@@ -370,13 +370,17 @@ export const Sidebar = ({
         <div className="fixed inset-0 bg-black/50 z-30 lg:hidden backdrop-blur-sm" onClick={() => setIsMobileOpen(false)} />
       )}
 
-      <AbsenceStatsModal
-        isOpen={showAbsenceStats}
-        onClose={() => setShowAbsenceStats(false)}
-        students={students}
-        semesterStart={semester.semesterStart}
-        semesterEnd={semester.semesterEnd}
-      />
+      {showAbsenceStats && (
+        <Suspense fallback={null}>
+          <AbsenceStatsModal
+            isOpen={showAbsenceStats}
+            onClose={() => setShowAbsenceStats(false)}
+            students={students}
+            semesterStart={semester.semesterStart}
+            semesterEnd={semester.semesterEnd}
+          />
+        </Suspense>
+      )}
 
       {/* Semester Archive Modal */}
       <Modal
@@ -445,13 +449,17 @@ export const Sidebar = ({
         </div>
       </Modal>
 
-      <NotificationPanel
-        isOpen={showNotifications}
-        onClose={() => setShowNotifications(false)}
-        announcements={announcements}
-        readIds={readAnnouncementIds}
-        userUid={userUid}
-      />
+      {showNotifications && (
+        <Suspense fallback={null}>
+          <NotificationPanel
+            isOpen={showNotifications}
+            onClose={() => setShowNotifications(false)}
+            announcements={announcements}
+            readIds={readAnnouncementIds}
+            userUid={userUid}
+          />
+        </Suspense>
+      )}
 
       <Modal
         isOpen={showNapSettings}

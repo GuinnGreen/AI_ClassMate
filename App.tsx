@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { Users, Upload, PanelLeftOpen } from 'lucide-react';
 import { auth } from './firebase';
@@ -27,7 +27,7 @@ import { FontStyles } from './components/FontStyles';
 import { Login } from './components/Login';
 import { Sidebar } from './components/Sidebar';
 import { Modal } from './components/ui/Modal';
-import { StudentManager } from './components/StudentManager';
+const StudentManager = lazy(() => import('./components/StudentManager').then(m => ({ default: m.StudentManager })));
 import { StudentImporter } from './components/StudentImporter';
 import { StudentDetailWorkspace } from './components/StudentDetailWorkspace';
 import { WhiteboardWorkspace } from './components/WhiteboardWorkspace';
@@ -393,17 +393,19 @@ function AppInner() {
             </div>
 
             {activeManagerTab === 'list' ? (
-              <StudentManager
-                students={students}
-                onClose={() => setIsStudentManagerOpen(false)}
-                onDelete={(ids) => {
-                  setPendingDeleteIds(ids);
-                  setShowDeleteAuth(true);
-                }}
-                onUpdateName={handleUpdateStudentName}
-                onUpdateSeatNumber={handleUpdateStudentSeatNumber}
-                onUpdateScore={handleUpdateStudentScore}
-              />
+              <Suspense fallback={<div className={`p-8 text-center ${theme.textLight}`}>載入學生管理...</div>}>
+                <StudentManager
+                  students={students}
+                  onClose={() => setIsStudentManagerOpen(false)}
+                  onDelete={(ids) => {
+                    setPendingDeleteIds(ids);
+                    setShowDeleteAuth(true);
+                  }}
+                  onUpdateName={handleUpdateStudentName}
+                  onUpdateSeatNumber={handleUpdateStudentSeatNumber}
+                  onUpdateScore={handleUpdateStudentScore}
+                />
+              </Suspense>
             ) : (
               <StudentImporter
                 onImport={handleImportStudents}

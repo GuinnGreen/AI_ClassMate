@@ -136,7 +136,7 @@ export const ManualScheduleEditor = ({
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         const ctx = canvas.getContext('2d')!;
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        await page.render({ canvas, canvasContext: ctx, viewport }).promise;
         const dataUrl = canvas.toDataURL('image/png');
         base64 = dataUrl.split(',')[1];
         mimeType = 'image/png';

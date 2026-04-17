@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { ClipboardList, Clock, Settings, Calendar as CalendarIcon, Minus, Plus, LayoutTemplate, Eye, EyeOff, HelpCircle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from '../contexts/ToastContext';
@@ -7,8 +7,8 @@ import { isCurrentPeriod, getPeriodParts } from '../utils/schedule';
 import { updateClassConfig } from '../services/firebaseService';
 import { getCurrentSemester } from '../utils/semester';
 import { Modal } from './ui/Modal';
-import { ManualScheduleEditor } from './ManualScheduleEditor';
-import { BoardTemplateEditor } from './BoardTemplateEditor';
+const ManualScheduleEditor = lazy(() => import('./ManualScheduleEditor').then(m => ({ default: m.ManualScheduleEditor })));
+const BoardTemplateEditor = lazy(() => import('./BoardTemplateEditor').then(m => ({ default: m.BoardTemplateEditor })));
 import { ClassConfig, BoardWritingMode } from '../types';
 
 const clockSizeMap = [
@@ -522,22 +522,24 @@ export const WhiteboardWorkspace = ({
         title="編輯課表"
         maxWidth="max-w-4xl"
       >
-        <ManualScheduleEditor
-          initialSchedule={config.weeklySchedule}
-          userUid={userUid}
-          hasEighthPeriod={config.hasEighthPeriod ?? false}
-          onToggleEighthPeriod={async (enabled) => {
-            const newConfig = { ...config, hasEighthPeriod: enabled };
-            if (onConfigUpdate) onConfigUpdate(newConfig);
-            await updateClassConfig(userUid, newConfig);
-          }}
-          onSave={async (newSchedule) => {
-            const newConfig = { ...config, weeklySchedule: newSchedule };
-            if (onConfigUpdate) onConfigUpdate(newConfig);
-            await updateClassConfig(userUid, newConfig);
-            setShowScheduleEditor(false);
-          }}
-        />
+        <Suspense fallback={<div className={`p-8 text-center ${theme.textLight}`}>載入課表編輯器...</div>}>
+          <ManualScheduleEditor
+            initialSchedule={config.weeklySchedule}
+            userUid={userUid}
+            hasEighthPeriod={config.hasEighthPeriod ?? false}
+            onToggleEighthPeriod={async (enabled) => {
+              const newConfig = { ...config, hasEighthPeriod: enabled };
+              if (onConfigUpdate) onConfigUpdate(newConfig);
+              await updateClassConfig(userUid, newConfig);
+            }}
+            onSave={async (newSchedule) => {
+              const newConfig = { ...config, weeklySchedule: newSchedule };
+              if (onConfigUpdate) onConfigUpdate(newConfig);
+              await updateClassConfig(userUid, newConfig);
+              setShowScheduleEditor(false);
+            }}
+          />
+        </Suspense>
       </Modal>
 
       {/* Template Editor Modal */}
@@ -547,12 +549,14 @@ export const WhiteboardWorkspace = ({
         title="編輯公告模板"
         maxWidth="max-w-2xl"
       >
-        <BoardTemplateEditor
-          config={config}
-          userUid={userUid}
-          onConfigUpdate={onConfigUpdate}
-          onClose={() => setShowTemplateEditor(false)}
-        />
+        <Suspense fallback={<div className={`p-8 text-center ${theme.textLight}`}>載入模板編輯器...</div>}>
+          <BoardTemplateEditor
+            config={config}
+            userUid={userUid}
+            onConfigUpdate={onConfigUpdate}
+            onClose={() => setShowTemplateEditor(false)}
+          />
+        </Suspense>
       </Modal>
     </div>
   );

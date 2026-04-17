@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import {
   ChevronLeft, Sparkles, Save, Trash2, ClipboardList,
   Smile, Frown, School, Clock, Settings, Copy, AlignLeft,
@@ -27,8 +27,8 @@ import {
 import { generateStudentComment, DEFAULT_SYSTEM_INSTRUCTION } from '../services/geminiService';
 import { Modal } from './ui/Modal';
 import { WeeklyCalendar } from './WeeklyCalendar';
-import { BehaviorEditor } from './BehaviorEditor';
-import { PrizeEditor } from './PrizeEditor';
+const BehaviorEditor = lazy(() => import('./BehaviorEditor').then(m => ({ default: m.BehaviorEditor })));
+const PrizeEditor = lazy(() => import('./PrizeEditor').then(m => ({ default: m.PrizeEditor })));
 import {
   Student,
   ClassConfig,
@@ -378,13 +378,20 @@ export const StudentDetailWorkspace = ({
   const [isTyping, setIsTyping] = useState(false);
   const typingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearTimers = useCallback(() => {
     if (typingRef.current) { clearInterval(typingRef.current); typingRef.current = null; }
     if (progressRef.current) { clearInterval(progressRef.current); progressRef.current = null; }
   }, []);
 
-  useEffect(() => clearTimers, [clearTimers]);
+  // Unmount 時清除所有計時器（避免對已 unmount 的元件 setState）
+  useEffect(() => {
+    return () => {
+      clearTimers();
+      if (copyTimeoutRef.current) { clearTimeout(copyTimeoutRef.current); copyTimeoutRef.current = null; }
+    };
+  }, [clearTimers]);
 
   const prevStudentId = useRef(student.id);
   useEffect(() => {
@@ -483,7 +490,11 @@ export const StudentDetailWorkspace = ({
     try {
       await navigator.clipboard.writeText(tempComment);
       setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => {
+        setIsCopied(false);
+        copyTimeoutRef.current = null;
+      }, 2000);
     } catch (err) {
       console.error('[handleCopyComment clipboard]', err);
       showError('複製失敗，瀏覽器可能不支援');
@@ -1061,11 +1072,13 @@ export const StudentDetailWorkspace = ({
             </button>
           </div>
           <div className={`border-t ${theme.border}`}></div>
-          <BehaviorEditor buttons={positiveBehaviors} onUpdate={(btns) => handleUpdateBehaviors('positive', btns)} title="正面表現 (Positive)" defaultValue={1} />
-          <div className={`border-t ${theme.border}`}></div>
-          <BehaviorEditor buttons={negativeBehaviors} onUpdate={(btns) => handleUpdateBehaviors('negative', btns)} title="待改進 (Improvement)" defaultValue={-1} />
-          <div className={`border-t ${theme.border}`}></div>
-          <PrizeEditor prizes={prizes} onUpdate={handleUpdatePrizes} />
+          <Suspense fallback={<div className={`p-4 text-sm ${theme.textLight}`}>載入中...</div>}>
+            <BehaviorEditor buttons={positiveBehaviors} onUpdate={(btns) => handleUpdateBehaviors('positive', btns)} title="正面表現 (Positive)" defaultValue={1} />
+            <div className={`border-t ${theme.border}`}></div>
+            <BehaviorEditor buttons={negativeBehaviors} onUpdate={(btns) => handleUpdateBehaviors('negative', btns)} title="待改進 (Improvement)" defaultValue={-1} />
+            <div className={`border-t ${theme.border}`}></div>
+            <PrizeEditor prizes={prizes} onUpdate={handleUpdatePrizes} />
+          </Suspense>
           <div className="pt-2">
             <button onClick={() => setIsBehaviorSettingsOpen(false)} className={`w-full py-3 ${theme.primary} text-white rounded-xl font-bold`}>完成設定</button>
           </div>
@@ -1101,7 +1114,7 @@ export const StudentDetailWorkspace = ({
                       { key: 'aiComment' as const, label: 'AI 評語' },
                   { key: 'tags' as const, label: '特質標籤' },
                   { key: 'totalScore' as const, label: '累計總分' },
-                ]).map(({ key, label, warning }) => (
+                ]).map(({ key, label }) => (
                   <label key={key} className={`flex items-center gap-3 p-3 rounded-xl border ${theme.border} ${theme.surface} cursor-pointer hover:${theme.surfaceAlt} transition`}>
                     <input
                       type="checkbox"
@@ -1110,7 +1123,6 @@ export const StudentDetailWorkspace = ({
                       className="w-4 h-4 rounded accent-current"
                     />
                     <span className={`font-bold text-sm ${theme.text}`}>{label}</span>
-                    {warning && <span className="text-xs text-red-400 font-bold">{warning}</span>}
                   </label>
                 ))}
               </div>
