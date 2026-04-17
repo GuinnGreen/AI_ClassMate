@@ -8,6 +8,7 @@ import { getCurrentSemester } from '../utils/semester';
 import { Modal } from './ui/Modal';
 import { ManualScheduleEditor } from './ManualScheduleEditor';
 import { BoardTemplateEditor } from './BoardTemplateEditor';
+import { LazyCat } from './LazyCat';
 import { ClassConfig, BoardWritingMode } from '../types';
 
 const clockSizeMap = [
@@ -190,9 +191,9 @@ export const WhiteboardWorkspace = ({
     <div className="flex flex-col h-full p-3 lg:p-8 overflow-hidden">
       {/* Header */}
       {showClock ? (
-        <div className="group flex flex-col lg:flex-row lg:justify-between lg:items-center mb-3 lg:mb-6 gap-1 lg:gap-0 shrink-0 pl-11 lg:pl-0">
-          <div className="flex items-center gap-2 relative">
-            <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex gap-0.5 mr-1">
+        <div className="group flex flex-col lg:flex-row lg:justify-between lg:items-center mb-3 lg:mb-6 gap-1 lg:gap-0 shrink-0 pl-11 lg:pl-0 overflow-hidden">
+          <div className="flex items-center gap-2 relative min-w-0">
+            <div className="flex gap-0.5 mr-1 lg:hidden lg:group-hover:flex lg:group-hover:animate-pop-in">
               <button
                 onClick={toggleClock}
                 className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition"
@@ -219,9 +220,15 @@ export const WhiteboardWorkspace = ({
             <h1 className={`${theme.text} ${cs.time} font-extrabold tracking-tight tabular-nums leading-none`}>{currentTime.time}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <CalendarIcon className={`${cs.calIcon} ${theme.textLight} shrink-0`} />
-              <p className={`${theme.text} ${cs.date} font-semibold tracking-wide`}>{currentTime.date}</p>
+            <div className={`${theme.text} ${cs.date} font-semibold tracking-wide text-right`}>
+              {(() => {
+                const match = currentTime.date.match(/^(.+日)\s*(星期.)$/);
+                if (!match) return <p>{currentTime.date}</p>;
+                return <>
+                  <p className="whitespace-nowrap flex items-center gap-2"><CalendarIcon className={`${cs.calIcon} ${theme.textLight} shrink-0`} />{match[1]}</p>
+                  <p className="whitespace-nowrap">{match[2]}</p>
+                </>;
+              })()}
             </div>
             <a
               href="https://ai-classmate.com/guide/"
@@ -307,7 +314,7 @@ export const WhiteboardWorkspace = ({
               {/* Template editor button */}
               <button
                 onClick={() => setShowTemplateEditor(true)}
-                className={`p-2 rounded-lg border ${theme.border} ${theme.surface} hover:opacity-80 transition ${theme.textLight}`}
+                className={`h-9 w-9 flex items-center justify-center rounded-lg border ${theme.border} ${theme.surface} hover:opacity-80 transition ${theme.textLight}`}
                 title="編輯模板"
               >
                 <Settings className="w-4 h-4" />
@@ -317,7 +324,7 @@ export const WhiteboardWorkspace = ({
               <div className="relative" ref={layoutMenuRef}>
                 <button
                   onClick={() => setShowLayoutMenu(v => !v)}
-                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition ${
+                  className={`h-9 px-3 rounded-lg border text-sm font-bold transition ${
                     showLayoutMenu
                       ? `${theme.primary} text-white border-transparent`
                       : `${theme.surface} ${theme.text} ${theme.border} hover:opacity-80`
@@ -365,7 +372,7 @@ export const WhiteboardWorkspace = ({
               {/* Edit / Save daily notes */}
               <button
                 onClick={() => isEditing ? saveBoard() : setIsEditing(true)}
-                className={`px-4 py-2 rounded-xl font-bold text-sm transition ${isEditing ? `${theme.primary} text-white` : `${theme.surface} ${theme.text} border ${theme.border}`}`}
+                className={`h-9 px-3 rounded-lg font-bold text-sm transition border ${isEditing ? `${theme.primary} text-white border-transparent` : `${theme.surface} ${theme.text} ${theme.border}`}`}
               >
                 {isEditing ? '儲存' : '編輯'}
               </button>
@@ -400,6 +407,7 @@ export const WhiteboardWorkspace = ({
               className={`${writingMode !== 'horizontal-tb' ? 'overflow-y-auto' : 'overflow-y-auto'} relative`}
               style={{ flex: '3' }}
             >
+              {/* <LazyCat /> 暫時隱藏，待調整後開放 */}
               <div className="p-5 h-full">
                 {isEditing ? (
                   <textarea

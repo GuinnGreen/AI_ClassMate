@@ -161,6 +161,16 @@ export function CorrectionList({
   }
 
   if (isAdding) {
+    const selectableIds = selectedLabel
+      ? students
+          .filter(s => !corrections.some(c => c.label === selectedLabel && c.studentId === s.id))
+          .map(s => s.id)
+      : [];
+    const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedStudentIds.has(id));
+    const toggleAll = () => {
+      if (allSelected) setSelectedStudentIds(new Set());
+      else setSelectedStudentIds(new Set(selectableIds));
+    };
     return (
       <div className="px-3 pb-4 space-y-3">
         <div className="flex items-center justify-between mb-1">
@@ -195,7 +205,20 @@ export function CorrectionList({
         {/* 選擇學生 */}
         {selectedLabel && (
           <div>
-            <span className={`text-[10px] font-bold ${theme.textLight} mb-1.5 block`}>選擇學生</span>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className={`text-[10px] font-bold ${theme.textLight}`}>選擇學生</span>
+              <button
+                onClick={toggleAll}
+                disabled={selectableIds.length === 0}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition disabled:opacity-30 ${
+                  allSelected
+                    ? `${theme.primary} text-white`
+                    : `${theme.surfaceAlt} ${theme.text} hover:opacity-80 border ${theme.border}`
+                }`}
+              >
+                {allSelected ? '取消全選' : '全選'}
+              </button>
+            </div>
             <div className="grid grid-cols-4 gap-1.5">
               {students.map(s => {
                 const seat = s.seatNumber ?? s.order ?? '?';

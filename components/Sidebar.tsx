@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { useTheme } from '../contexts/ThemeContext';
+import { COLOR_SCHEMES } from '../constants/theme';
 import { Modal } from './ui/Modal';
 import { Student, ClassConfig, Announcement, CorrectionItem } from '../types';
 import { formatDate } from '../utils/date';
@@ -35,6 +36,8 @@ export const Sidebar = ({
   isSidebarCollapsed,
   onToggleSidebarCollapse,
   zhuyinMode,
+  colorScheme,
+  setColorScheme,
   onZhuyinToggle,
   announcements,
   readAnnouncementIds,
@@ -59,6 +62,8 @@ export const Sidebar = ({
   isSidebarCollapsed: boolean;
   onToggleSidebarCollapse: () => void;
   zhuyinMode: boolean;
+  colorScheme: string;
+  setColorScheme: (key: string) => void;
   onZhuyinToggle: () => void;
   announcements: Announcement[];
   readAnnouncementIds: string[];
@@ -212,7 +217,8 @@ export const Sidebar = ({
 
               <div className={`flex-1 overflow-y-auto px-3 pb-4 space-y-1 custom-scrollbar ${fontSizeLevel === 0 ? 'text-sm' :
                 fontSizeLevel === 1 ? 'text-base' :
-                  fontSizeLevel === 2 ? 'text-lg' : 'text-xl'
+                  fontSizeLevel === 2 ? 'text-lg' :
+                    fontSizeLevel === 3 ? 'text-xl' : 'text-2xl'
                 }`}>
                 {students.map(student => {
                   const todayScore = student.dailyRecords[today]?.points.reduce((sum, p) => sum + p.value, 0) ?? 0;
@@ -326,14 +332,29 @@ export const Sidebar = ({
               </button>
               <Type className={`w-4 h-4 ${theme.text}`} />
               <button
-                onClick={() => setFontSizeLevel(Math.min(3, fontSizeLevel + 1))}
+                onClick={() => setFontSizeLevel(Math.min(4, fontSizeLevel + 1))}
                 className={`p-1.5 rounded-md hover:${theme.surfaceAlt} ${theme.textLight} hover:${theme.text} transition disabled:opacity-30`}
-                disabled={fontSizeLevel === 3}
+                disabled={fontSizeLevel === 4}
                 title="放大字體"
               >
                 <Plus className="w-4 h-4" />
               </button>
             </div>
+          </div>
+          {/* 莫蘭迪配色選擇器 */}
+          <div className="flex items-center justify-center gap-1.5 px-1">
+            {COLOR_SCHEMES.map(scheme => (
+              <button
+                key={scheme.key}
+                onClick={() => setColorScheme(scheme.key)}
+                className={`w-5 h-5 rounded-full transition-all duration-200 hover:scale-125 ${colorScheme === scheme.key ? 'ring-2 ring-offset-2 scale-110' : 'hover:opacity-80'}`}
+                style={{
+                  backgroundColor: scheme.dot,
+                  ['--tw-ring-color' as string]: scheme.dot,
+                }}
+                title={scheme.label}
+              />
+            ))}
           </div>
           <button
             onClick={onLogout}
