@@ -22,7 +22,8 @@ import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule, DailyRecor
 
 export const subscribeToStudents = (
   userUid: string,
-  callback: (students: Student[]) => void
+  callback: (students: Student[]) => void,
+  onError?: (err: Error) => void,
 ) => {
   const studentsRef = collection(db, `users/${userUid}/students`);
   return onSnapshot(studentsRef, (snapshot) => {
@@ -34,12 +35,13 @@ export const subscribeToStudents = (
       return a.id.localeCompare(b.id);
     });
     callback(studentList);
-  });
+  }, (err) => { console.error('[subscribeToStudents] 學生資料同步失敗', err); onError?.(err); });
 };
 
 export const subscribeToConfig = (
   userUid: string,
-  callback: (config: ClassConfig) => void
+  callback: (config: ClassConfig) => void,
+  onError?: (err: Error) => void,
 ) => {
   const configRef = doc(db, `users/${userUid}/settings/config`);
   return onSnapshot(configRef, (docSnap) => {
@@ -48,7 +50,7 @@ export const subscribeToConfig = (
     } else {
       setDoc(configRef, { class_board: '' });
     }
-  });
+  }, (err) => { console.error('[subscribeToConfig] 班級設定同步失敗', err); onError?.(err); });
 };
 
 export const addPointToStudent = async (
@@ -334,7 +336,8 @@ export const archiveSemester = async (user: User, password: string) => {
 // --- Announcements ---
 
 export const subscribeToAnnouncements = (
-  callback: (announcements: Announcement[]) => void
+  callback: (announcements: Announcement[]) => void,
+  onError?: (err: Error) => void,
 ) => {
   const announcementsRef = collection(db, 'announcements');
   const q = query(announcementsRef, where('active', '==', true));
@@ -342,7 +345,7 @@ export const subscribeToAnnouncements = (
     const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Announcement[];
     list.sort((a, b) => b.createdAt - a.createdAt);
     callback(list);
-  });
+  }, (err) => { console.error('[subscribeToAnnouncements] 公告同步失敗', err); onError?.(err); });
 };
 
 export const getReadAnnouncementIds = async (userUid: string): Promise<string[]> => {
@@ -355,7 +358,8 @@ export const getReadAnnouncementIds = async (userUid: string): Promise<string[]>
 
 export const subscribeToReadAnnouncements = (
   userUid: string,
-  callback: (ids: string[]) => void
+  callback: (ids: string[]) => void,
+  onError?: (err: Error) => void,
 ) => {
   const ref = doc(db, `users/${userUid}/settings/readAnnouncements`);
   return onSnapshot(ref, (snap) => {
@@ -365,7 +369,7 @@ export const subscribeToReadAnnouncements = (
     }
     const data = snap.data();
     callback(Object.keys(data).filter(k => data[k] === true));
-  });
+  }, (err) => { console.error('[subscribeToReadAnnouncements] 已讀狀態同步失敗', err); onError?.(err); });
 };
 
 export const markAnnouncementAsRead = async (userUid: string, announcementId: string) => {
@@ -377,14 +381,15 @@ export const markAnnouncementAsRead = async (userUid: string, announcementId: st
 
 export const subscribeToCorrections = (
   userUid: string,
-  callback: (corrections: CorrectionItem[]) => void
+  callback: (corrections: CorrectionItem[]) => void,
+  onError?: (err: Error) => void,
 ) => {
   const correctionsRef = collection(db, `users/${userUid}/corrections`);
   return onSnapshot(correctionsRef, (snapshot) => {
     const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as CorrectionItem[];
     list.sort((a, b) => a.createdAt - b.createdAt);
     callback(list);
-  });
+  }, (err) => { console.error('[subscribeToCorrections] 訂正資料同步失敗', err); onError?.(err); });
 };
 
 export const addCorrectionBatch = async (

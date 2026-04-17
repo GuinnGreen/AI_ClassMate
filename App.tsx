@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { Users, Upload, PanelLeftOpen } from 'lucide-react';
 import { auth } from './firebase';
-import { LIGHT_THEME, DARK_THEME } from './constants/theme';
+import { LIGHT_THEME, buildTheme } from './constants/theme';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastProvider, useToast } from './contexts/ToastContext';
 import { Student, ClassConfig, Announcement, CorrectionItem } from './types';
 import {
   subscribeToStudents,
@@ -33,15 +34,34 @@ import { WhiteboardWorkspace } from './components/WhiteboardWorkspace';
 import { TeacherToolbar } from './components/TeacherToolbar';
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AppInner />
+    </ToastProvider>
+  );
+}
+
+function AppInner() {
+  const { showError, showSuccess } = useToast();
   const { updateAvailable } = useAppUpdate();
   const [user, setUser] = useState<User | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [classConfig, setClassConfig] = useState<ClassConfig>({ class_board: '' });
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [fontSizeLevel, setFontSizeLevel] = useState(1);
-  const [clockSizeLevel, setClockSizeLevel] = useState(1);
+  const [fontSizeLevel, setFontSizeLevel] = useState(() => {
+    try { const saved = localStorage.getItem('fontSizeLevel'); return saved ? Number(saved) : 1; }
+    catch { return 1; }
+  });
+  const [clockSizeLevel, setClockSizeLevel] = useState(() => {
+    try { const saved = localStorage.getItem('clockSizeLevel'); return saved ? Number(saved) : 1; }
+    catch { return 1; }
+  });
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [colorScheme, setColorScheme] = useState(() => {
+    try { return localStorage.getItem('colorScheme') || 'slate'; }
+    catch { return 'slate'; }
+  });
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>([]);
   const [corrections, setCorrections] = useState<CorrectionItem[]>([]);
@@ -53,7 +73,7 @@ export default function App() {
   const preNapDarkRef = useRef(false);
   const isDarkModeRef = useRef(false);
   const wasInNapRef = useRef(false);
-  const theme = isDarkMode ? DARK_THEME : LIGHT_THEME;
+  const theme = buildTheme(isDarkMode, colorScheme);
 
   // Student Manager State
   const [isStudentManagerOpen, setIsStudentManagerOpen] = useState(false);
@@ -69,6 +89,21 @@ export default function App() {
   }, [isSidebarCollapsed]);
 
   useEffect(() => {
+    try { localStorage.setItem('fontSizeLevel', String(fontSizeLevel)); }
+    catch { /* ignore */ }
+  }, [fontSizeLevel]);
+
+  useEffect(() => {
+    try { localStorage.setItem('clockSizeLevel', String(clockSizeLevel)); }
+    catch { /* ignore */ }
+  }, [clockSizeLevel]);
+
+  useEffect(() => {
+    try { localStorage.setItem('colorScheme', colorScheme); }
+    catch { /* ignore */ }
+  }, [colorScheme]);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (!currentUser) setLoading(false);
@@ -78,16 +113,17 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
+    const handleSyncError = (label: string) => () => showError(`${label}同步失敗，請檢查網路`);
     const unsubStudents = subscribeToStudents(user.uid, (studentList) => {
       setStudents(studentList);
       setLoading(false);
-    });
-    const unsubConfig = subscribeToConfig(user.uid, setClassConfig);
-    const unsubAnnouncements = subscribeToAnnouncements(setAnnouncements);
-    const unsubReadAnnouncements = subscribeToReadAnnouncements(user.uid, setReadAnnouncementIds);
-    const unsubCorrections = subscribeToCorrections(user.uid, setCorrections);
+    }, handleSyncError('學生資料'));
+    const unsubConfig = subscribeToConfig(user.uid, setClassConfig, handleSyncError('班級設定'));
+    const unsubAnnouncements = subscribeToAnnouncements(setAnnouncements, handleSyncError('公告'));
+    const unsubReadAnnouncements = subscribeToReadAnnouncements(user.uid, setReadAnnouncementIds, handleSyncError('已讀狀態'));
+    const unsubCorrections = subscribeToCorrections(user.uid, setCorrections, handleSyncError('訂正資料'));
     return () => { unsubStudents(); unsubConfig(); unsubAnnouncements(); unsubReadAnnouncements(); unsubCorrections(); };
-  }, [user?.uid]);
+  }, [user?.uid, showError]);
 
   // Nap time auto-dark: keep ref in sync
   useEffect(() => { isDarkModeRef.current = isDarkMode; }, [isDarkMode]);
@@ -142,12 +178,21 @@ export default function App() {
 
   const handleNapTimeChange = async (start: string, end: string) => {
     if (!user) return;
+    const prev = classConfig;
     const newConfig = { ...classConfig, napTimeStart: start || '', napTimeEnd: end || '' };
     setClassConfig(newConfig);
-    await updateClassConfig(user.uid, newConfig);
+    try { await updateClassConfig(user.uid, newConfig); }
+    catch (err) {
+      console.error('[handleNapTimeChange]', err);
+      setClassConfig(prev);
+      showError('午休時間儲存失敗');
+    }
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = async () => {
+    try { await signOut(auth); }
+    catch (err) { console.error('[handleLogout]', err); showError('登出失敗，請重試'); }
+  };
 
   const handleDeleteSelectedStudents = async () => {
     if (!user) return;
@@ -182,22 +227,29 @@ export default function App() {
 
   const handleUpdateStudentScore = async (id: string, newScore: number) => {
     if (!user) return;
-    await setStudentScore(user.uid, id, newScore);
+    try { await setStudentScore(user.uid, id, newScore); }
+    catch (err) { console.error('[handleUpdateStudentScore]', err); showError('更新分數失敗'); }
   };
 
   const handleImportStudents = async (names: string[]) => {
     if (!user) return;
-    await importStudents(user.uid, names, students.length);
-    setIsStudentManagerOpen(false);
-    alert(`成功匯入 ${names.length} 位學生！`);
+    try {
+      await importStudents(user.uid, names, students.length);
+      setIsStudentManagerOpen(false);
+      showSuccess(`成功匯入 ${names.length} 位學生`);
+    } catch (err) {
+      console.error('[handleImportStudents]', err);
+      showError('匯入學生失敗，請重試');
+    }
   };
 
   const getFontSizeClass = () => {
     switch (fontSizeLevel) {
       case 0: return 'text-sm';
       case 1: return 'text-base';
-      case 2: return 'text-xl';
-      case 3: return 'text-2xl';
+      case 2: return 'text-lg';
+      case 3: return 'text-xl';
+      case 4: return 'text-2xl';
       default: return 'text-base';
     }
   };
@@ -243,14 +295,22 @@ export default function App() {
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebarCollapse={() => setIsSidebarCollapsed(prev => !prev)}
             zhuyinMode={classConfig.zhuyinMode ?? false}
+            colorScheme={colorScheme}
+            setColorScheme={setColorScheme}
             corrections={corrections}
             announcements={announcements}
             readAnnouncementIds={readAnnouncementIds}
             onZhuyinToggle={async () => {
               if (!user) return;
+              const prev = classConfig;
               const newConfig = { ...classConfig, zhuyinMode: !classConfig.zhuyinMode };
               setClassConfig(newConfig);
-              await updateClassConfig(user.uid, newConfig);
+              try { await updateClassConfig(user.uid, newConfig); }
+              catch (err) {
+                console.error('[onZhuyinToggle]', err);
+                setClassConfig(prev);
+                showError('注音設定儲存失敗');
+              }
             }}
           />
           <div className={`flex-1 flex flex-col h-full overflow-hidden p-3 lg:p-4 relative transition-[margin] duration-300 ease-in-out ${isSidebarCollapsed ? 'lg:ml-0' : 'lg:ml-72'}`}>

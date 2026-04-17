@@ -5,6 +5,7 @@ import {
   Check, Lock, Download, BookX, Users, HelpCircle, Gift
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useToast } from '../contexts/ToastContext';
 import { formatDate } from '../utils/date';
 import { getCurrentSemester } from '../utils/semester';
 import { levenshteinDistance } from '../utils/levenshtein';
@@ -61,6 +62,7 @@ export const StudentDetailWorkspace = ({
   onConfigUpdate?: (config: ClassConfig) => void;
 }) => {
   const theme = useTheme();
+  const { showError, showSuccess } = useToast();
   const { canGenerate, cooldownRemaining, dailyUsageCount, dailyLimit, isLimitReached, recordGeneration } = useAiRateLimit({ userUid });
   const [mode, setMode] = useState<'daily' | 'ai'>('daily');
   const [mobileTab, setMobileTab] = useState<'record' | 'scoring'>('scoring');
@@ -219,15 +221,19 @@ export const StudentDetailWorkspace = ({
   const prizeShopEnabled = classConfig.prizeShopEnabled ?? false;
 
   const handleUpdateBehaviors = async (type: 'positive' | 'negative', newBtns: BehaviorButton[]) => {
-    const newConfig = await updateCustomBehaviors(
-      userUid, classConfig, type, newBtns, positiveBehaviors, negativeBehaviors
-    );
-    if (onConfigUpdate) onConfigUpdate(newConfig);
+    try {
+      const newConfig = await updateCustomBehaviors(
+        userUid, classConfig, type, newBtns, positiveBehaviors, negativeBehaviors
+      );
+      if (onConfigUpdate) onConfigUpdate(newConfig);
+    } catch (err) { console.error('[handleUpdateBehaviors]', err); showError('行為按鈕更新失敗'); }
   };
 
   const handleUpdatePrizes = async (newPrizes: PrizeItem[]) => {
-    const newConfig = await updatePrizes(userUid, classConfig, newPrizes);
-    if (onConfigUpdate) onConfigUpdate(newConfig);
+    try {
+      const newConfig = await updatePrizes(userUid, classConfig, newPrizes);
+      if (onConfigUpdate) onConfigUpdate(newConfig);
+    } catch (err) { console.error('[handleUpdatePrizes]', err); showError('獎品設定更新失敗'); }
   };
 
   const handleRedeemPrize = (prize: PrizeItem) => {
@@ -236,8 +242,10 @@ export const StudentDetailWorkspace = ({
 
   const handleTogglePrizeShop = async () => {
     const newConfig = { ...classConfig, prizeShopEnabled: !prizeShopEnabled };
-    await updateClassConfig(userUid, newConfig);
-    if (onConfigUpdate) onConfigUpdate(newConfig);
+    try {
+      await updateClassConfig(userUid, newConfig);
+      if (onConfigUpdate) onConfigUpdate(newConfig);
+    } catch (err) { console.error('[handleTogglePrizeShop]', err); showError('獎品商店切換失敗'); }
   };
 
   const [isClassMode, setIsClassMode] = useState(false);
@@ -249,16 +257,18 @@ export const StudentDetailWorkspace = ({
   const targetCount = students.length - absentCount;
 
   const handleAddPoint = async (behavior: BehaviorButton) => {
-    if (isClassMode) {
-      const msg = absentCount > 0
-        ? `確定為全班 ${targetCount} 位同學（排除 ${absentCount} 位請假）加「${behavior.label}」(${behavior.value > 0 ? '+' : ''}${behavior.value})？`
-        : `確定為全班 ${targetCount} 位同學加「${behavior.label}」(${behavior.value > 0 ? '+' : ''}${behavior.value})？`;
-      if (!window.confirm(msg)) return;
-      await addPointToAllStudents(userUid, students, currentDate, behavior);
-    } else {
-      const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
-      await addPointToStudent(userUid, student.id, currentDate, currentDayRecord, behavior);
-    }
+    try {
+      if (isClassMode) {
+        const msg = absentCount > 0
+          ? `確定為全班 ${targetCount} 位同學（排除 ${absentCount} 位請假）加「${behavior.label}」(${behavior.value > 0 ? '+' : ''}${behavior.value})？`
+          : `確定為全班 ${targetCount} 位同學加「${behavior.label}」(${behavior.value > 0 ? '+' : ''}${behavior.value})？`;
+        if (!window.confirm(msg)) return;
+        await addPointToAllStudents(userUid, students, currentDate, behavior);
+      } else {
+        const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
+        await addPointToStudent(userUid, student.id, currentDate, currentDayRecord, behavior);
+      }
+    } catch (err) { console.error('[handleAddPoint]', err); showError('加分失敗，請檢查網路'); }
   };
 
   const handleDeleteGroup = async (label: string) => {
@@ -270,9 +280,11 @@ export const StudentDetailWorkspace = ({
 
     if (targetIndexInReversed !== -1) {
       const targetPoint = reversedPoints[targetIndexInReversed];
-      await deletePointFromStudent(
-        userUid, student.id, currentDate, currentDayRecord, targetPoint.id, targetPoint.value
-      );
+      try {
+        await deletePointFromStudent(
+          userUid, student.id, currentDate, currentDayRecord, targetPoint.id, targetPoint.value
+        );
+      } catch (err) { console.error('[handleDeleteGroup]', err); showError('刪除記錄失敗'); }
     }
   };
 
@@ -303,8 +315,10 @@ export const StudentDetailWorkspace = ({
 
   const handleSaveNote = async () => {
     const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
-    await saveStudentNote(userUid, student.id, currentDate, currentDayRecord, tempNote);
-    setNoteSyncMode(true);
+    try {
+      await saveStudentNote(userUid, student.id, currentDate, currentDayRecord, tempNote);
+      setNoteSyncMode(true);
+    } catch (err) { console.error('[handleSaveNote]', err); showError('儲存註記失敗'); }
   };
 
   const handleCloseNoteModal = () => {
@@ -315,6 +329,7 @@ export const StudentDetailWorkspace = ({
 
   const handleSyncNote = async () => {
     setIsSyncing(true);
+    let failedCount = 0;
     for (const targetId of syncTargetIds) {
       const target = students.find(s => s.id === targetId);
       if (!target) continue;
@@ -323,12 +338,19 @@ export const StudentDetailWorkspace = ({
       const mergedNote = existingNote
         ? `${existingNote}\n---\n${tempNote}`
         : tempNote;
-      await saveStudentNote(userUid, targetId, currentDate, targetDayRecord, mergedNote);
+      try {
+        await saveStudentNote(userUid, targetId, currentDate, targetDayRecord, mergedNote);
+      } catch (err) {
+        console.error('[handleSyncNote] failed for', targetId, err);
+        failedCount++;
+      }
     }
     setIsSyncing(false);
     setNoteSyncMode(false);
     setSyncTargetIds(new Set());
     setIsNoteModalOpen(false);
+    if (failedCount > 0) showError(`同步註記失敗 ${failedCount} 位`);
+    else if (syncTargetIds.size > 0) showSuccess(`已同步至 ${syncTargetIds.size} 位學生`);
   };
 
   const todayAbsence = (student.dailyRecords[currentDate] || { absence: null }).absence ?? null;
@@ -337,8 +359,10 @@ export const StudentDetailWorkspace = ({
   const handleSetAbsence = async (type: AbsenceType) => {
     const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
     const newAbsence = todayAbsence === type ? null : type;
-    await setStudentAbsence(userUid, student.id, currentDate, currentDayRecord, newAbsence);
-    setIsAbsenceExpanded(false);
+    try {
+      await setStudentAbsence(userUid, student.id, currentDate, currentDayRecord, newAbsence);
+      setIsAbsenceExpanded(false);
+    } catch (err) { console.error('[handleSetAbsence]', err); showError('請假狀態更新失敗'); }
   };
 
   // --- AI Logic ---
@@ -372,7 +396,8 @@ export const StudentDetailWorkspace = ({
   }, [student.id, student.comment, student.originalAiComment]);
 
   const handleToggleTag = async (tag: string) => {
-    await toggleStudentTag(userUid, student.id, tag, student.tags);
+    try { await toggleStudentTag(userUid, student.id, tag, student.tags); }
+    catch (err) { console.error('[handleToggleTag]', err); showError('標籤更新失敗'); }
   };
 
   const PROGRESS_MESSAGES = [
@@ -419,8 +444,13 @@ export const StudentDetailWorkspace = ({
 
       setIsTyping(false);
       setOriginalAiText(generatedText);
-      await updateStudentComment(userUid, student.id, generatedText, generatedText);
-      await logAiGeneration(userUid, student.id, commentLength, !!customPrompt);
+      try {
+        await updateStudentComment(userUid, student.id, generatedText, generatedText);
+        await logAiGeneration(userUid, student.id, commentLength, !!customPrompt);
+      } catch (err) {
+        console.error('[handleGenerateAI saveResult]', err);
+        showError('AI 評語儲存失敗，請手動複製保存');
+      }
       recordGeneration();
     } catch (err: unknown) {
       clearTimers();
@@ -428,40 +458,51 @@ export const StudentDetailWorkspace = ({
       setIsTyping(false);
       setIsGenerating(false);
       const msg = err instanceof Error ? err.message : '未知錯誤';
-      alert("生成失敗: " + msg);
+      console.error('[handleGenerateAI]', err);
+      showError(`生成 AI 評語失敗：${msg}`);
     }
   };
 
   const handleSaveComment = async () => {
-    await updateStudentComment(userUid, student.id, tempComment);
-    if (originalAiText && tempComment) {
-      const distance = levenshteinDistance(originalAiText, tempComment);
-      await logCommentEdit(userUid, student.id, {
-        type: 'comment_edit',
-        originalLength: originalAiText.length,
-        finalLength: tempComment.length,
-        editDistance: distance,
-        lengthSetting: commentLength
-      });
-    }
+    try {
+      await updateStudentComment(userUid, student.id, tempComment);
+      if (originalAiText && tempComment) {
+        const distance = levenshteinDistance(originalAiText, tempComment);
+        await logCommentEdit(userUid, student.id, {
+          type: 'comment_edit',
+          originalLength: originalAiText.length,
+          finalLength: tempComment.length,
+          editDistance: distance,
+          lengthSetting: commentLength
+        });
+      }
+    } catch (err) { console.error('[handleSaveComment]', err); showError('儲存評語失敗'); }
   };
 
   const handleCopyComment = async () => {
-    await navigator.clipboard.writeText(tempComment);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(tempComment);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('[handleCopyComment clipboard]', err);
+      showError('複製失敗，瀏覽器可能不支援');
+      return;
+    }
 
     if (tempComment !== student.comment) {
       await handleSaveComment();
     } else if (originalAiText) {
       const distance = levenshteinDistance(originalAiText, tempComment);
-      await logCommentEdit(userUid, student.id, {
-        type: 'comment_copy',
-        originalLength: originalAiText.length,
-        finalLength: tempComment.length,
-        editDistance: distance,
-        lengthSetting: commentLength
-      });
+      try {
+        await logCommentEdit(userUid, student.id, {
+          type: 'comment_copy',
+          originalLength: originalAiText.length,
+          finalLength: tempComment.length,
+          editDistance: distance,
+          lengthSetting: commentLength
+        });
+      } catch (err) { console.error('[handleCopyComment logEdit]', err); }
     }
   };
 
