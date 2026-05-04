@@ -145,14 +145,23 @@ export const generateStudentComment = async (
     return result.data.text || "無法生成評語，請稍後再試。";
   } catch (error: unknown) {
     console.error("[AI] generateText 失敗:", error);
-    const errMsg = error instanceof Error ? error.message : String(error);
-    if (errMsg.includes("resource-exhausted") || errMsg.includes("配額")) {
-      return "今日 AI 使用配額已達上限，請明日再試。";
+    const code = (error as { code?: string }).code || "";
+    const message = error instanceof Error ? error.message : String(error);
+
+    switch (code) {
+      case "functions/resource-exhausted":
+        return "今日 AI 使用配額已達上限，請明日再試。";
+      case "functions/unauthenticated":
+        return "請先登入後再使用 AI 功能。";
+      case "functions/invalid-argument":
+        return `輸入有誤：${message}`;
+      case "functions/deadline-exceeded":
+        return "AI 處理超時，請稍後重試。";
+      case "functions/internal":
+        return `AI 服務內部錯誤（${message || "未知"}）`;
+      default:
+        return `AI 服務暫時無法使用：${message || "請稍後再試"}`;
     }
-    if (errMsg.includes("unauthenticated") || errMsg.includes("登入")) {
-      return "請先登入後再使用 AI 功能。";
-    }
-    return "AI 服務暫時無法使用，請稍後再試。";
   }
 };
 
@@ -268,6 +277,14 @@ export const parseScheduleFromImage = async (
     try {
       const parsed = JSON.parse(cleaned);
       if (Array.isArray(parsed)) return validateAndRepairSchedule(parsed);
+      // Groq/OpenRouter 用 response_format: json_object 時會包成物件（如 {"schedule":[...]}）
+      // 取第一個 array property 作為 schedule
+      if (parsed && typeof parsed === 'object') {
+        for (const key of Object.keys(parsed)) {
+          const val = (parsed as Record<string, unknown>)[key];
+          if (Array.isArray(val)) return validateAndRepairSchedule(val);
+        }
+      }
     } catch { /* 繼續 */ }
 
     const start = cleaned.indexOf('[');
@@ -287,11 +304,21 @@ export const parseScheduleFromImage = async (
     const result = await callParseSchedule({ prompt, base64Data, mimeType });
     return extractAndParseJson(result.data.text);
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : String(error);
-    console.error("[課表辨識] 失敗:", errMsg);
-    if (errMsg.includes("resource-exhausted") || errMsg.includes("配額")) {
-      throw new Error("今日 AI 使用配額已達上限，請明日再試。");
+    const code = (error as { code?: string }).code || "";
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[課表辨識] 失敗:", code || message);
+
+    switch (code) {
+      case "functions/resource-exhausted":
+        throw new Error("今日 AI 使用配額已達上限，請明日再試。");
+      case "functions/unauthenticated":
+        throw new Error("請先登入後再使用課表辨識功能。");
+      case "functions/invalid-argument":
+        throw new Error(`輸入有誤：${message}`);
+      case "functions/deadline-exceeded":
+        throw new Error("課表辨識超時，請改用較小的圖片或手動輸入。");
+      default:
+        throw new Error(`課表辨識失敗：${message || "請稍後再試"}`);
     }
-    throw new Error(`課表辨識失敗：${errMsg}`);
   }
 };

@@ -304,10 +304,27 @@ export const archiveSemester = async (user: User, password: string) => {
   await reauthenticateWithCredential(user, credential);
 
   const studentsSnap = await getDocs(collection(db, `users/${user.uid}/students`));
+
+  // archiveId: ISO 時間戳替換非法字元（: 與 . 會破壞 Firestore doc id）
+  const archivedAt = Date.now();
+  const archiveId = new Date(archivedAt).toISOString().replace(/[:.]/g, '-');
+
   const batch = writeBatch(db);
+
+  // 1. archive metadata（記錄封存時間 + 學生數）
+  const metaRef = doc(db, `users/${user.uid}/archives/${archiveId}`);
+  batch.set(metaRef, {
+    archivedAt,
+    studentCount: studentsSnap.docs.length,
+  });
+
+  // 2. 每個學生：先寫整份 doc 備份到 archives subcollection，再清空當前
   studentsSnap.docs.forEach(d => {
+    const backupRef = doc(db, `users/${user.uid}/archives/${archiveId}/students/${d.id}`);
+    batch.set(backupRef, { ...d.data(), archivedAt });
     batch.update(d.ref, { totalScore: 0, dailyRecords: {} });
   });
+
   await batch.commit();
 };
 
