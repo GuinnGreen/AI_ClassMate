@@ -2,15 +2,23 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 公告系統：已登入使用者可讀取
+    // 公告系統：已登入使用者可讀；寫入僅限後端
     match /announcements/{announcementId} {
       allow read: if request.auth != null;
+      allow write: if false;
     }
 
-    // 鎖定 users 集合下的每一個老師專屬資料夾 (userId)
+    // 使用者個人資料夾（含所有 subcollection: students / settings / corrections / archives / research_logs / logs）
+    // 注：logs 集合的「寫入限制」改由 application layer 控制
+    //   - functions 用 admin SDK 寫（繞過 rules）
+    //   - 前端 caller 已從 services/firebaseService.ts 移除（避免雙重計數）
     match /users/{userId}/{document=**} {
-      // 【核心防護】只有當「登入者的 UID」等於「資料夾的 userId」時，才允許讀寫！
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // 預設拒絕所有未明確允許的存取
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

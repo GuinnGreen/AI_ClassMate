@@ -3,8 +3,7 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
+export default defineConfig(() => {
   return {
     base: '/',
     server: {
@@ -13,9 +12,8 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react(), tailwindcss()],
     define: {
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GROQ_API_KEY': JSON.stringify(env.GROQ_API_KEY),
-      'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY),
+      // LLM API keys 已遷移至 Cloud Functions（functions/src/index.ts）
+      // 前端僅持有 Firebase 公鑰，所有 LLM 呼叫透過 httpsCallable 走後端 proxy
       '__APP_BUILD_TIME__': JSON.stringify(process.env.VITE_APP_BUILD_TIME || new Date().toISOString()),
     },
     resolve: {

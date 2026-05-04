@@ -255,24 +255,11 @@ export const updatePrizes = async (
 };
 
 // --- Research Logging ---
+// 注：logAiGeneration 與 logScheduleRecognition 已遷移至 Cloud Functions
+// (functions/src/index.ts 的 generateText / parseSchedule callable 內部寫 logs)
+// 前端 firestore.rules 已禁止 logs 寫入以防雙重計數失效 rate limit
 
-export const logAiGeneration = async (
-  userUid: string,
-  studentId: string,
-  lengthSetting: number,
-  hasCustomPrompt: boolean
-) => {
-  const logRef = collection(db, `users/${userUid}/logs`);
-  await addDoc(logRef, {
-    studentId,
-    type: 'ai_generate',
-    timestamp: Date.now(),
-    lengthSetting,
-    hasCustomPrompt
-  });
-};
-
-// 查詢今日 AI 使用次數（rate limiting 用）
+// 查詢今日 AI 使用次數（rate limiting 用，前端只讀不寫）
 export const getTodayAiGenerationCount = async (userUid: string): Promise<number> => {
   const logRef = collection(db, `users/${userUid}/logs`);
   const startOfToday = new Date();
@@ -280,15 +267,6 @@ export const getTodayAiGenerationCount = async (userUid: string): Promise<number
   const q = query(logRef, where('timestamp', '>=', startOfToday.getTime()));
   const snapshot = await getDocs(q);
   return snapshot.size;
-};
-
-// 記錄課表辨識使用（與 logAiGeneration 同 collection）
-export const logScheduleRecognition = async (userUid: string) => {
-  const logRef = collection(db, `users/${userUid}/logs`);
-  await addDoc(logRef, {
-    type: 'schedule_recognize',
-    timestamp: Date.now(),
-  });
 };
 
 export const logCommentEdit = async (

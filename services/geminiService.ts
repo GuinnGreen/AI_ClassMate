@@ -1,187 +1,36 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { Student, DaySchedule } from "../types";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../firebase";
 
-// --- Multi-Key Rotation Logic ---
+// --- 隱私關鍵字過濾（保護輔導紀錄不外洩至 LLM） ---
+const PRIVACY_KEYWORDS = [
+  '離婚', '離異', '單親', '家暴', '低收', '中低收',
+  '疾病', '生病', '憂鬱', '焦慮', '霸凌', '輔導',
+  '父母', '父親', '母親', '隔代', '寄養', '受虐',
+  '藥物', '過動', '亞斯', '自閉', '經濟', '貧困',
+  'ADHD', '特教', '身障', '殘',
+  '過世', '離世', '酗酒', '吸毒', '入獄', '外籍', '新住民'
+];
 
-const rawKeys = process.env.API_KEY || "";
-const API_KEYS = rawKeys
-  .split(/[,;\s]+/)
-  .map((k) => k.trim())
-  .filter((k) => k.length > 0);
-
-console.log(`[Gemini Service] Initialized with ${API_KEYS.length} keys.`);
-
-if (API_KEYS.length === 0) {
-  console.warn("Project Warning: No API_KEY found in process.env");
+function sanitizeNoteForRag(note: string): string | null {
+  if (!note?.trim()) return null;
+  for (const kw of PRIVACY_KEYWORDS) {
+    if (note.includes(kw)) return null;
+  }
+  return note.trim();
 }
 
-const clientPool = API_KEYS.map((key) => new GoogleGenAI({ apiKey: key }));
-let currentKeyIndex = 0;
+// --- Cloud Functions Callable Wrappers ---
+// LLM 呼叫已遷移至 functions/src/index.ts，前端僅透過 callable 呼叫，不再持有 API key
+const callGenerateText = httpsCallable<
+  { prompt: string; studentId?: string; lengthSetting?: number; hasCustomPrompt?: boolean },
+  { text: string }
+>(functions, "generateText");
 
-const MAX_BACKOFF_MS = 30000;
-
-async function callWithRetry<T>(
-  operationName: string,
-  operation: (client: GoogleGenAI) => Promise<T>
-): Promise<T> {
-  if (clientPool.length === 0) {
-    throw new Error("系統錯誤：未設定 API Key");
-  }
-
-  const maxAttempts = Math.max(clientPool.length * 3, 5);
-  let attempt = 0;
-  let delayMs = 2000;
-
-  while (attempt < maxAttempts) {
-    try {
-      const client = clientPool[currentKeyIndex];
-      return await operation(client);
-    } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      const errStatus = (error as { status?: number }).status;
-      const isRateLimit =
-        errMsg.includes("429") ||
-        errStatus === 429 ||
-        errMsg.includes("RESOURCE_EXHAUSTED");
-
-      if (isRateLimit) {
-        console.warn(
-          `[Gemini] Key #${currentKeyIndex} hit rate limit (${operationName}). Rotating...`
-        );
-
-        currentKeyIndex = (currentKeyIndex + 1) % clientPool.length;
-        attempt++;
-
-        if (attempt % clientPool.length === 0) {
-          console.warn(`[Gemini] All keys exhausted. Waiting ${delayMs}ms before retry...`);
-          await new Promise(res => setTimeout(res, delayMs));
-          delayMs = Math.min(delayMs * 2, MAX_BACKOFF_MS);
-        }
-
-        continue;
-      }
-
-      throw error;
-    }
-  }
-
-  throw new Error("系統忙碌中 (所有 API Key 皆達上限)，請稍後再試。");
-}
-
-// --- Groq Fallback (OpenAI-compatible API) ---
-
-const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
-
-async function callGroqFallback(prompt: string): Promise<string> {
-  if (!GROQ_API_KEY) {
-    throw new Error("未設定 GROQ_API_KEY，無法使用備援 AI");
-  }
-
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${GROQ_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "qwen/qwen3-32b",
-      messages: [
-        { role: "system", content: "/no_think" },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Groq API 錯誤 (${response.status}): ${errorBody}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-  // 清除 Qwen3 可能殘留的 <think>...</think> 標籤
-  return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-}
-
-// --- OpenRouter Text Fallback (for comment generation) ---
-
-async function callOpenRouterTextFallback(prompt: string): Promise<string> {
-  if (!OPENROUTER_API_KEY) {
-    throw new Error("未設定 OPENROUTER_API_KEY，無法使用備援 AI");
-  }
-
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "qwen/qwen-2.5-72b-instruct:free",
-      messages: [
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`OpenRouter API 錯誤 (${response.status}): ${errorBody}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-  return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-}
-
-// --- OpenAI-compatible Vision API (shared by Groq Vision & OpenRouter) ---
-
-async function callOpenAICompatibleVision(
-  apiUrl: string,
-  apiKey: string,
-  model: string,
-  providerName: string,
-  prompt: string,
-  base64Data: string,
-  mimeType: string
-): Promise<string> {
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image_url",
-              image_url: { url: `data:${mimeType};base64,${base64Data}` },
-            },
-            { type: "text", text: prompt },
-          ],
-        },
-      ],
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`${providerName} API 錯誤 (${response.status}): ${errorBody}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-  return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-}
+const callParseSchedule = httpsCallable<
+  { prompt: string; base64Data: string; mimeType: string },
+  { text: string }
+>(functions, "parseSchedule");
 
 export const DEFAULT_SYSTEM_INSTRUCTION = `
 你是一位擁有二十年教學經驗、信奉正向管教與成長型思維的台灣國小班導師。請根據以下提供的學生整學期行為紀錄與教師勾選的特質標籤，以溫暖、委婉且具備建設性的語氣，撰寫一份給家長閱讀的期末評語。
@@ -194,6 +43,11 @@ export const DEFAULT_SYSTEM_INSTRUCTION = `
 5. 結尾需包含具體可操作的「下一步建議」（Feed Forward），為學生新學期提供努力方向。
 6. 格式為一段完整的文章，不需要列點。
 7. 用台灣繁體中文撰寫。
+8. 字數需嚴格控制在【字數要求】所指定的範圍內，不可低於下限也不可超過上限。
+9. 禁止寫出**過去的**具體日期或時間段（如「4 月 25 日」「學期初」「上週」「最近」「本週」），但可以使用「下學期」「未來」「接下來」等指向未來的詞彙以配合 Feed Forward。
+10. 禁止使用問候語開頭（如「親愛的家長您好」「Dear Parents」「您好」），請直接從學生的特質或表現切入。
+11. 禁止提及家庭狀況、宗教、政治、健康疾病、輔導內容等隱私敏感話題。
+12. 評語中至少出現學生姓名 1 次（避免空泛、像通用範本）。
 
 【優良評語範例】
 範例一（學業優異但內向）：
@@ -215,27 +69,50 @@ export const generateStudentComment = async (
   if (sortedDates.length === 0) {
     historyText = "該生本學期尚無具體加減分紀錄。";
   } else {
+    const positiveCount = new Map<string, number>();
+    const negativeCount = new Map<string, number>();
+    const sanitizedNotes: string[] = [];
+
     sortedDates.forEach(date => {
       const record = student.dailyRecords[date];
-      if (record.points.length > 0 || record.note) {
-        historyText += `\n[日期: ${date}]`;
-        if (record.points.length > 0) {
-          const positives = record.points.filter(p => p.value > 0).map(p => p.label).join(", ");
-          const negatives = record.points
-            .filter(p => p.value < 0 && !p.label.startsWith('🎁'))
-            .map(p => p.label).join(", ");
-          if (positives) historyText += `\n  - 優點表現: ${positives}`;
-          if (negatives) historyText += `\n  - 待改進: ${negatives}`;
+      record.points.forEach(p => {
+        if (p.value > 0) {
+          positiveCount.set(p.label, (positiveCount.get(p.label) || 0) + 1);
+        } else if (p.value < 0 && !p.label.startsWith('🎁')) {
+          negativeCount.set(p.label, (negativeCount.get(p.label) || 0) + 1);
         }
-        if (record.note) {
-          historyText += `\n  - 教師筆記: ${record.note}`;
-        }
-      }
+      });
+      const sanitized = sanitizeNoteForRag(record.note);
+      if (sanitized) sanitizedNotes.push(sanitized);
     });
+
+    const topPositives = [...positiveCount.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, count]) => `- ${label} (${count} 次)`);
+
+    const topNegatives = [...negativeCount.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, count]) => `- ${label} (${count} 次)`);
+
+    const sections: string[] = [];
+    if (topPositives.length > 0) {
+      sections.push(`【高頻優良表現】\n${topPositives.join('\n')}`);
+    }
+    if (topNegatives.length > 0) {
+      sections.push(`【需要改進處】\n${topNegatives.join('\n')}`);
+    }
+    if (sanitizedNotes.length > 0) {
+      sections.push(`【整學期累計教師行為觀察】\n${sanitizedNotes.join('；')}`);
+    }
+    historyText = sections.length > 0
+      ? sections.join('\n\n')
+      : "該生本學期尚無具體加減分紀錄。";
   }
 
   const tagsText = student.tags.length > 0 ? student.tags.join(", ") : "無特定標籤";
-  const lengthDesc = `約 ${wordCount} 字左右`;
+  const lengthDesc = `${Math.max(wordCount - 10, 100)}-${wordCount + 10} 字之間（含標點符號）`;
   const baseInstruction = customInstruction.trim() || DEFAULT_SYSTEM_INSTRUCTION;
 
   const prompt = `
@@ -259,48 +136,23 @@ export const generateStudentComment = async (
   `;
 
   try {
-    const responseText = await callWithRetry("generateStudentComment", async (client) => {
-      const response = await client.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: prompt,
-        config: {
-          temperature: 0.7,
-        }
-      });
-      return response.text;
+    const result = await callGenerateText({
+      prompt,
+      studentId: student.id,
+      lengthSetting: wordCount,
+      hasCustomPrompt: !!customInstruction.trim(),
     });
-
-    return responseText || "無法生成評語，請稍後再試。";
+    return result.data.text || "無法生成評語，請稍後再試。";
   } catch (error: unknown) {
-    console.error("Gemini AI Error:", error);
+    console.error("[AI] generateText 失敗:", error);
     const errMsg = error instanceof Error ? error.message : String(error);
-
-    // Gemini 全部失敗時，嘗試 Groq 備援
-    if (GROQ_API_KEY) {
-      try {
-        console.warn("[AI] Gemini 全部失敗，嘗試 Groq fallback...");
-        const fallbackText = await callGroqFallback(prompt);
-        if (fallbackText) return fallbackText;
-      } catch (groqError: unknown) {
-        console.error("[AI] Groq fallback 也失敗:", groqError);
-      }
+    if (errMsg.includes("resource-exhausted") || errMsg.includes("配額")) {
+      return "今日 AI 使用配額已達上限，請明日再試。";
     }
-
-    // OpenRouter fallback（第三層備援）
-    if (OPENROUTER_API_KEY) {
-      try {
-        console.warn("[AI] Groq 也失敗，嘗試 OpenRouter fallback...");
-        const fallbackText = await callOpenRouterTextFallback(prompt);
-        if (fallbackText) return fallbackText;
-      } catch (openRouterError: unknown) {
-        console.error("[AI] OpenRouter fallback 也失敗:", openRouterError);
-      }
+    if (errMsg.includes("unauthenticated") || errMsg.includes("登入")) {
+      return "請先登入後再使用 AI 功能。";
     }
-
-    if (errMsg.includes("系統忙碌中")) {
-      return errMsg;
-    }
-    return "AI 服務暫時無法使用 (請檢查網路或 API Key)";
+    return "AI 服務暫時無法使用，請稍後再試。";
   }
 };
 
@@ -431,115 +283,15 @@ export const parseScheduleFromImage = async (
     throw new Error("AI 回傳的格式無法解析，請重試或手動輸入。");
   }
 
-  const SCHEDULE_RESPONSE_SCHEMA = {
-    type: Type.ARRAY,
-    minItems: "5",
-    maxItems: "5",
-    items: {
-      type: Type.OBJECT,
-      required: ["dayOfWeek", "periods"],
-      properties: {
-        dayOfWeek: { type: Type.INTEGER },
-        periods: {
-          type: Type.ARRAY,
-          minItems: "7",
-          maxItems: "7",
-          items: {
-            type: Type.OBJECT,
-            required: ["periodName", "subject"],
-            properties: {
-              periodName: {
-                type: Type.STRING,
-                enum: ["第一節","第二節","第三節","第四節","第五節","第六節","第七節"],
-              },
-              subject: { type: Type.STRING },
-            },
-          },
-        },
-      },
-    },
-  };
-
-  const VISION_SUPPORTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-  const errors: string[] = [];
-
-  // --- Layer 1: Gemini ---
-  if (API_KEYS.length > 0) {
-    try {
-      const daySchedules = await callWithRetry("parseScheduleFromImage", async (client) => {
-        const response = await client.models.generateContent({
-          model: 'gemini-2.0-flash',
-          contents: {
-            parts: [
-              { inlineData: { mimeType, data: base64Data } },
-              { text: prompt }
-            ]
-          },
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: SCHEDULE_RESPONSE_SCHEMA,
-            temperature: 0.1,
-          }
-        });
-        return extractAndParseJson(response.text || "[]");
-      });
-      return daySchedules;
-    } catch (error: unknown) {
-      const detail = error instanceof Error ? error.message : String(error);
-      console.warn("[課表辨識] Gemini 失敗:", detail);
-      errors.push(`Gemini: ${detail}`);
+  try {
+    const result = await callParseSchedule({ prompt, base64Data, mimeType });
+    return extractAndParseJson(result.data.text);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("[課表辨識] 失敗:", errMsg);
+    if (errMsg.includes("resource-exhausted") || errMsg.includes("配額")) {
+      throw new Error("今日 AI 使用配額已達上限，請明日再試。");
     }
+    throw new Error(`課表辨識失敗：${errMsg}`);
   }
-
-  // --- Layer 2: Groq Vision ---
-  if (GROQ_API_KEY && VISION_SUPPORTED_TYPES.includes(mimeType)) {
-    try {
-      console.warn("[課表辨識] 嘗試 Groq Vision 備援...");
-      const text = await callOpenAICompatibleVision(
-        "https://api.groq.com/openai/v1/chat/completions",
-        GROQ_API_KEY,
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "Groq Vision",
-        prompt,
-        base64Data,
-        mimeType
-      );
-      return extractAndParseJson(text);
-    } catch (error: unknown) {
-      const detail = error instanceof Error ? error.message : String(error);
-      console.warn("[課表辨識] Groq Vision 失敗:", detail);
-      errors.push(`Groq Vision: ${detail}`);
-    }
-  } else if (GROQ_API_KEY) {
-    console.warn(`[課表辨識] Groq Vision 不支援 ${mimeType}，跳過`);
-    errors.push(`Groq Vision: 不支援 ${mimeType} 格式`);
-  }
-
-  // --- Layer 3: OpenRouter ---
-  if (OPENROUTER_API_KEY && VISION_SUPPORTED_TYPES.includes(mimeType)) {
-    try {
-      console.warn("[課表辨識] 嘗試 OpenRouter 備援...");
-      const text = await callOpenAICompatibleVision(
-        "https://openrouter.ai/api/v1/chat/completions",
-        OPENROUTER_API_KEY,
-        "qwen/qwen-2.5-vl-72b-instruct:free",
-        "OpenRouter",
-        prompt,
-        base64Data,
-        mimeType
-      );
-      return extractAndParseJson(text);
-    } catch (error: unknown) {
-      const detail = error instanceof Error ? error.message : String(error);
-      console.warn("[課表辨識] OpenRouter 失敗:", detail);
-      errors.push(`OpenRouter: ${detail}`);
-    }
-  } else if (OPENROUTER_API_KEY) {
-    console.warn(`[課表辨識] OpenRouter 不支援 ${mimeType}，跳過`);
-    errors.push(`OpenRouter: 不支援 ${mimeType} 格式`);
-  }
-
-  // 全部失敗
-  console.error("[課表辨識] 所有 AI 服務皆失敗:", errors);
-  throw new Error(`所有 AI 服務皆無法使用，請稍後再試。\n${errors.join("\n")}`);
 };

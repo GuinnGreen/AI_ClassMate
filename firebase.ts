@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 
 // 使用環境變數讀取設定 (Vite 使用 import.meta.env)
 const firebaseConfig = {
@@ -16,3 +17,5 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+// LLM 呼叫透過此 functions instance 走後端 proxy
+export const functions = getFunctions(app, "asia-east1");

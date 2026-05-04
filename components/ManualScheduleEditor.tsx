@@ -4,7 +4,6 @@ import { useTheme } from '../contexts/ThemeContext';
 import { DaySchedule, Period } from '../types';
 import { parseScheduleFromImage } from '../services/geminiService';
 import { useAiRateLimit } from '../hooks/useAiRateLimit';
-import { logScheduleRecognition } from '../services/firebaseService';
 import * as pdfjsLib from 'pdfjs-dist';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -176,7 +175,7 @@ export const ManualScheduleEditor = ({
         }
         return next;
       });
-      await logScheduleRecognition(userUid);
+      // 注：logScheduleRecognition 已遷移至 Cloud Functions（parseSchedule callable 內部寫 logs）
       recordGeneration();
     } catch (err: unknown) {
       setImportError(err instanceof Error ? err.message : '辨識失敗，請重試。');

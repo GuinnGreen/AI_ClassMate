@@ -20,7 +20,6 @@ import {
   updateCustomBehaviors,
   updatePrizes,
   updateClassConfig,
-  logAiGeneration,
   logCommentEdit,
   verifyPassword,
 } from '../services/firebaseService';
@@ -453,7 +452,7 @@ export const StudentDetailWorkspace = ({
       setOriginalAiText(generatedText);
       try {
         await updateStudentComment(userUid, student.id, generatedText, generatedText);
-        await logAiGeneration(userUid, student.id, commentLength, !!customPrompt);
+        // 注：logAiGeneration 已遷移至 Cloud Functions（generateText callable 內部寫 logs）
       } catch (err) {
         console.error('[handleGenerateAI saveResult]', err);
         showError('AI 評語儲存失敗，請手動複製保存');
