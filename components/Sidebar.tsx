@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, memo, Suspense } from 'react';
 import {
   Users, LogOut, School, Edit3, Moon, Sun,
   Plus, Minus, Type, Sunset, BarChart2, PanelLeftClose, Languages, Bell, Archive, Settings
@@ -15,7 +15,7 @@ const AbsenceStatsModal = lazy(() => import('./AbsenceStatsModal').then(m => ({ 
 const NotificationPanel = lazy(() => import('./NotificationPanel').then(m => ({ default: m.NotificationPanel })));
 import { CorrectionList } from './CorrectionList';
 
-export const Sidebar = ({
+export const Sidebar = memo(({
   students,
   selectedStudentId,
   onSelectStudent,
@@ -514,4 +514,4 @@ export const Sidebar = ({
       </Modal>
     </>
   );
-};
+});

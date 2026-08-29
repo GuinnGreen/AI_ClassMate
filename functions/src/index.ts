@@ -17,36 +17,51 @@ const OPENROUTER_API_KEY = defineSecret("OPENROUTER_API_KEY");
 
 const DAILY_QUOTA = 30;
 
-// ---- 共用：rate limit 檢查 ----
+// Gemini Vision 支援的影像格式（PDF 已在前端轉為 image/png）
+const ALLOWED_IMAGE_MIMES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+];
+
+// ---- 共用：配額預留（transaction 內檢查 + 寫 log，杜絕檢查與計數間的空窗） ----
 // timestamp 用 Date.now() 毫秒數字（與前端 getTodayAiGenerationCount 對齊）
-async function checkRateLimit(uid: string): Promise<void> {
-  const startOfDayMs = new Date().setHours(0, 0, 0, 0);
-
-  const snapshot = await db
-    .collection(`users/${uid}/logs`)
-    .where("timestamp", ">=", startOfDayMs)
-    .count()
-    .get();
-
-  const count = snapshot.data().count;
-  if (count >= DAILY_QUOTA) {
-    throw new HttpsError(
-      "resource-exhausted",
-      `每日 AI 使用配額已達上限（${DAILY_QUOTA} 次）`
-    );
-  }
-}
-
-async function writeLog(
+async function reserveQuota(
   uid: string,
   type: "ai_generate" | "schedule_recognize",
   extra: Record<string, unknown> = {}
-): Promise<void> {
-  await db.collection(`users/${uid}/logs`).add({
-    type,
-    timestamp: Date.now(),
-    ...extra,
+): Promise<FirebaseFirestore.DocumentReference> {
+  const logsRef = db.collection(`users/${uid}/logs`);
+  const startOfDayMs = new Date().setHours(0, 0, 0, 0);
+
+  return db.runTransaction(async (t) => {
+    const countSnap = await t.get(
+      logsRef.where("timestamp", ">=", startOfDayMs).count()
+    );
+    if (countSnap.data().count >= DAILY_QUOTA) {
+      throw new HttpsError(
+        "resource-exhausted",
+        `每日 AI 使用配額已達上限（${DAILY_QUOTA} 次）`
+      );
+    }
+    const logRef = logsRef.doc();
+    t.set(logRef, { type, timestamp: Date.now(), ...extra });
+    return logRef;
   });
+}
+
+// LLM 呼叫失敗時退還已預留的配額
+async function refundQuota(
+  logRef: FirebaseFirestore.DocumentReference
+): Promise<void> {
+  try {
+    await logRef.delete();
+  } catch (err) {
+    console.error("[refundQuota] 配額退還失敗", err);
+  }
 }
 
 // ---- Callable: generateText（評語生成） ----
@@ -67,20 +82,23 @@ export const generateText = onCall(
       throw new HttpsError("invalid-argument", "prompt 過長");
     }
 
-    await checkRateLimit(uid);
-
-    const text = await routeTextGeneration(prompt, {
-      geminiKeysCsv: GEMINI_API_KEY.value(),
-      groqApiKey: GROQ_API_KEY.value(),
-      openrouterApiKey: OPENROUTER_API_KEY.value(),
-    });
-
-    await writeLog(uid, "ai_generate", {
+    const logRef = await reserveQuota(uid, "ai_generate", {
       studentId: req.data?.studentId ?? null,
       lengthSetting: req.data?.lengthSetting ?? null,
       hasCustomPrompt: req.data?.hasCustomPrompt ?? false,
     });
-    return { text };
+
+    try {
+      const text = await routeTextGeneration(prompt, {
+        geminiKeysCsv: GEMINI_API_KEY.value(),
+        groqApiKey: GROQ_API_KEY.value(),
+        openrouterApiKey: OPENROUTER_API_KEY.value(),
+      });
+      return { text };
+    } catch (err) {
+      await refundQuota(logRef);
+      throw err;
+    }
   }
 );
 
@@ -105,20 +123,26 @@ export const parseSchedule = onCall(
     if (!prompt || !base64Data || !mimeType) {
       throw new HttpsError("invalid-argument", "缺少必要參數");
     }
+    if (!ALLOWED_IMAGE_MIMES.includes(mimeType)) {
+      throw new HttpsError("invalid-argument", `不支援的影像格式：${mimeType}`);
+    }
     // base64 size limit: ~5MB raw → ~6.7MB base64
     if (base64Data.length > 7_000_000) {
       throw new HttpsError("invalid-argument", "圖片過大（請壓縮至 5MB 以下）");
     }
 
-    await checkRateLimit(uid);
+    const logRef = await reserveQuota(uid, "schedule_recognize");
 
-    const text = await routeVisionGeneration(prompt, base64Data, mimeType, {
-      geminiKeysCsv: GEMINI_API_KEY.value(),
-      groqApiKey: GROQ_API_KEY.value(),
-      openrouterApiKey: OPENROUTER_API_KEY.value(),
-    });
-
-    await writeLog(uid, "schedule_recognize");
-    return { text };
+    try {
+      const text = await routeVisionGeneration(prompt, base64Data, mimeType, {
+        geminiKeysCsv: GEMINI_API_KEY.value(),
+        groqApiKey: GROQ_API_KEY.value(),
+        openrouterApiKey: OPENROUTER_API_KEY.value(),
+      });
+      return { text };
+    } catch (err) {
+      await refundQuota(logRef);
+      throw err;
+    }
   }
 );

@@ -74,6 +74,7 @@ export const StudentDetailWorkspace = ({
   const [noteSyncMode, setNoteSyncMode] = useState(false);
   const [syncTargetIds, setSyncTargetIds] = useState<Set<string>>(new Set());
   const [isSyncing, setIsSyncing] = useState(false);
+  const syncAbortRef = useRef(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [verifyPasswordVal, setVerifyPasswordVal] = useState('');
   const [verifyError, setVerifyError] = useState('');
@@ -328,8 +329,11 @@ export const StudentDetailWorkspace = ({
 
   const handleSyncNote = async () => {
     setIsSyncing(true);
+    syncAbortRef.current = false;
     let failedCount = 0;
     for (const targetId of syncTargetIds) {
+      // 切換學生時中止後續寫入，避免用過期的 tempNote 繼續同步
+      if (syncAbortRef.current) break;
       const target = students.find(s => s.id === targetId);
       if (!target) continue;
       const targetDayRecord = target.dailyRecords[currentDate] || { points: [], note: '', absence: null };
@@ -388,6 +392,7 @@ export const StudentDetailWorkspace = ({
   useEffect(() => {
     return () => {
       clearTimers();
+      syncAbortRef.current = true;
       if (copyTimeoutRef.current) { clearTimeout(copyTimeoutRef.current); copyTimeoutRef.current = null; }
     };
   }, [clearTimers]);
@@ -395,6 +400,7 @@ export const StudentDetailWorkspace = ({
   const prevStudentId = useRef(student.id);
   useEffect(() => {
     if (prevStudentId.current !== student.id) {
+      syncAbortRef.current = true; // 中止進行中的註記同步
       setTempComment(student.comment);
       setOriginalAiText(student.originalAiComment || '');
       prevStudentId.current = student.id;

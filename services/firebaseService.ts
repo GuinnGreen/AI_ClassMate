@@ -13,6 +13,7 @@ import {
   query,
   where,
   getDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential, User } from 'firebase/auth';
 import { db } from '../firebase';
@@ -62,10 +63,20 @@ export const addPointToStudent = async (
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
   const newPoint: PointLog = { id: crypto.randomUUID(), label: behavior.label, value: behavior.value, timestamp: Date.now() };
-  const updatedPoints = [...currentDayRecord.points, newPoint];
-  await updateDoc(studentRef, {
-    totalScore: increment(behavior.value),
-    [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note, absence: currentDayRecord.absence ?? null }
+  // 以 transaction 讀取伺服器最新當日紀錄，避免多裝置同時操作時互相覆蓋
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(studentRef);
+    if (!snap.exists()) throw new Error('學生資料不存在');
+    const serverRecord: DailyRecord =
+      (snap.data().dailyRecords?.[currentDate] as DailyRecord | undefined) ?? currentDayRecord;
+    transaction.update(studentRef, {
+      totalScore: increment(behavior.value),
+      [`dailyRecords.${currentDate}`]: {
+        points: [...serverRecord.points, newPoint],
+        note: serverRecord.note,
+        absence: serverRecord.absence ?? null,
+      },
+    });
   });
 };
 
@@ -97,15 +108,28 @@ export const deletePointFromStudent = async (
   userUid: string,
   studentId: string,
   currentDate: string,
-  currentDayRecord: DailyRecord,
+  _currentDayRecord: DailyRecord,
   pointId: string,
-  pointValue: number
+  _pointValue: number
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
-  const updatedPoints = currentDayRecord.points.filter(p => p.id !== pointId);
-  await updateDoc(studentRef, {
-    totalScore: increment(-pointValue),
-    [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note, absence: currentDayRecord.absence ?? null }
+  // 以 transaction 讀取伺服器最新紀錄：扣分金額以伺服器上該筆 point 為準，
+  // 若該筆已被其他裝置刪除則直接略過，避免重複扣分
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(studentRef);
+    if (!snap.exists()) throw new Error('學生資料不存在');
+    const serverRecord = snap.data().dailyRecords?.[currentDate] as DailyRecord | undefined;
+    if (!serverRecord) return;
+    const targetPoint = serverRecord.points.find(p => p.id === pointId);
+    if (!targetPoint) return;
+    transaction.update(studentRef, {
+      totalScore: increment(-targetPoint.value),
+      [`dailyRecords.${currentDate}`]: {
+        points: serverRecord.points.filter(p => p.id !== pointId),
+        note: serverRecord.note,
+        absence: serverRecord.absence ?? null,
+      },
+    });
   });
 };
 

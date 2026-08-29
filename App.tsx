@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { Users, Upload, PanelLeftOpen } from 'lucide-react';
 import { auth } from './firebase';
@@ -128,10 +128,10 @@ function AppInner() {
   // Nap time auto-dark: keep ref in sync
   useEffect(() => { isDarkModeRef.current = isDarkMode; }, [isDarkMode]);
 
-  const handleToggleDarkMode = (newValue: boolean) => {
+  const handleToggleDarkMode = useCallback((newValue: boolean) => {
     if (napAutoActiveRef.current) napAutoActiveRef.current = false;
     setIsDarkMode(newValue);
-  };
+  }, []);
 
   useEffect(() => {
     const { napTimeStart, napTimeEnd } = classConfig;
@@ -176,7 +176,7 @@ function AppInner() {
     return () => clearInterval(interval);
   }, [classConfig.napTimeStart, classConfig.napTimeEnd]);
 
-  const handleNapTimeChange = async (start: string, end: string) => {
+  const handleNapTimeChange = useCallback(async (start: string, end: string) => {
     if (!user) return;
     const prev = classConfig;
     const newConfig = { ...classConfig, napTimeStart: start || '', napTimeEnd: end || '' };
@@ -187,12 +187,34 @@ function AppInner() {
       setClassConfig(prev);
       showError('午休時間儲存失敗');
     }
-  };
+  }, [user, classConfig, showError]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try { await signOut(auth); }
     catch (err) { console.error('[handleLogout]', err); showError('登出失敗，請重試'); }
-  };
+  }, [showError]);
+
+  const handleManageStudents = useCallback(() => {
+    setActiveManagerTab(students.length === 0 ? 'import' : 'list');
+    setIsStudentManagerOpen(true);
+  }, [students.length]);
+
+  const handleToggleSidebarCollapse = useCallback(() => {
+    setIsSidebarCollapsed(prev => !prev);
+  }, []);
+
+  const handleZhuyinToggle = useCallback(async () => {
+    if (!user) return;
+    const prev = classConfig;
+    const newConfig = { ...classConfig, zhuyinMode: !classConfig.zhuyinMode };
+    setClassConfig(newConfig);
+    try { await updateClassConfig(user.uid, newConfig); }
+    catch (err) {
+      console.error('[onZhuyinToggle]', err);
+      setClassConfig(prev);
+      showError('注音設定儲存失敗');
+    }
+  }, [user, classConfig, showError]);
 
   const handleDeleteSelectedStudents = async () => {
     if (!user) return;
@@ -277,10 +299,7 @@ function AppInner() {
             students={students}
             selectedStudentId={selectedStudentId}
             onSelectStudent={setSelectedStudentId}
-            onManageStudents={() => {
-              setActiveManagerTab(students.length === 0 ? 'import' : 'list');
-              setIsStudentManagerOpen(true);
-            }}
+            onManageStudents={handleManageStudents}
             onLogout={handleLogout}
             fontSizeLevel={fontSizeLevel}
             setFontSizeLevel={setFontSizeLevel}
@@ -294,25 +313,14 @@ function AppInner() {
             userUid={user!.uid}
             user={user!}
             isSidebarCollapsed={isSidebarCollapsed}
-            onToggleSidebarCollapse={() => setIsSidebarCollapsed(prev => !prev)}
+            onToggleSidebarCollapse={handleToggleSidebarCollapse}
             zhuyinMode={classConfig.zhuyinMode ?? false}
             colorScheme={colorScheme}
             setColorScheme={setColorScheme}
             corrections={corrections}
             announcements={announcements}
             readAnnouncementIds={readAnnouncementIds}
-            onZhuyinToggle={async () => {
-              if (!user) return;
-              const prev = classConfig;
-              const newConfig = { ...classConfig, zhuyinMode: !classConfig.zhuyinMode };
-              setClassConfig(newConfig);
-              try { await updateClassConfig(user.uid, newConfig); }
-              catch (err) {
-                console.error('[onZhuyinToggle]', err);
-                setClassConfig(prev);
-                showError('注音設定儲存失敗');
-              }
-            }}
+            onZhuyinToggle={handleZhuyinToggle}
           />
           <div className={`flex-1 flex flex-col h-full overflow-hidden p-3 lg:p-4 relative transition-[margin] duration-300 ease-in-out ${isSidebarCollapsed ? 'lg:ml-0' : 'lg:ml-72'}`}>
             <div className={`flex-1 overflow-hidden rounded-3xl shadow-sm border ${theme.border} ${theme.surface} relative`}>
