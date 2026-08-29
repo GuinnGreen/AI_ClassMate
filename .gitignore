@@ -26,3 +26,6 @@ dist-ssr
 # Claude
 CLAUDE.md
 .claude/
+
+# Local isolated development worktrees
+.worktrees/
