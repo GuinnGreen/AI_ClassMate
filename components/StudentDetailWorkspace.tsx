@@ -79,6 +79,7 @@ export const StudentDetailWorkspace = ({
   const [verifyPasswordVal, setVerifyPasswordVal] = useState('');
   const [verifyError, setVerifyError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const verificationRequestRef = useRef(0);
   const [pendingAction, setPendingAction] = useState<'notes' | 'export' | 'ai'>('notes');
 
   // Behavior Settings Modal
@@ -291,10 +292,12 @@ export const StudentDetailWorkspace = ({
   // --- Secure Verification Logic ---
   const handleVerifyPassword = async () => {
     if (!auth.currentUser) return;
+    const requestId = ++verificationRequestRef.current;
     setIsVerifying(true);
     setVerifyError('');
     try {
       await verifyPassword(auth.currentUser, verifyPasswordVal);
+      if (requestId !== verificationRequestRef.current) return;
       setShowPasswordModal(false);
       setVerifyPasswordVal('');
       if (pendingAction === 'export') {
@@ -307,9 +310,9 @@ export const StudentDetailWorkspace = ({
         setIsNoteModalOpen(true);
       }
     } catch {
-      setVerifyError('密碼錯誤');
+      if (requestId === verificationRequestRef.current) setVerifyError('密碼錯誤');
     } finally {
-      setIsVerifying(false);
+      if (requestId === verificationRequestRef.current) setIsVerifying(false);
     }
   };
 
@@ -403,6 +406,7 @@ export const StudentDetailWorkspace = ({
   useEffect(() => {
     if (prevStudentId.current !== student.id) {
       syncAbortRef.current = true; // 中止進行中的註記同步
+      verificationRequestRef.current++;
       setIsNoteModalOpen(false);
       setTempNote('');
       setNoteSyncMode(false);
@@ -410,6 +414,7 @@ export const StudentDetailWorkspace = ({
       setShowPasswordModal(false);
       setVerifyPasswordVal('');
       setVerifyError('');
+      setIsVerifying(false);
       setTempComment(student.comment);
       setOriginalAiText(student.originalAiComment || '');
       prevStudentId.current = student.id;

@@ -112,6 +112,35 @@ describe('StudentDetailWorkspace note privacy', () => {
     expect(service.saveStudentNote).not.toHaveBeenCalled();
   });
 
+  it('does not reopen student A note when password verification resolves after switching to B', async () => {
+    const first = student('student-1', '甲生', '甲生機密紀錄');
+    const second = student('student-2', '乙生', '乙生紀錄');
+    const students = [first, second];
+    let resolveVerification!: () => void;
+    const pendingVerification = new Promise<void>((resolve) => {
+      resolveVerification = resolve;
+    });
+    service.verifyPassword.mockReturnValue(pendingVerification);
+    const view = render(workspace(first, students));
+
+    fireEvent.click(screen.getByTitle('輔導紀錄'));
+    fireEvent.change(screen.getByPlaceholderText('Password'), {
+      target: { value: 'teacher-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '解鎖紀錄' }));
+    await waitFor(() => expect(service.verifyPassword).toHaveBeenCalledTimes(1));
+
+    view.rerender(workspace(second, students));
+    await act(async () => {
+      resolveVerification();
+      await pendingVerification;
+    });
+
+    expect(screen.queryByPlaceholderText('請輸入私密觀察紀錄...')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('甲生機密紀錄')).not.toBeInTheDocument();
+    expect(service.saveStudentNote).not.toHaveBeenCalled();
+  });
+
   it('reports only completed note writes when a student switch aborts synchronization', async () => {
     const first = student('student-1', '甲生', '甲生原有紀錄');
     const second = student('student-2', '乙生', '');

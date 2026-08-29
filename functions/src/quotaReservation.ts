@@ -12,6 +12,11 @@ export interface QuotaReservationReference {
   update(data: Record<string, unknown>): Promise<unknown>;
 }
 
+export type QuotaSettlementErrorHandler = (
+  status: Exclude<QuotaReservationStatus, 'reserved'>,
+  error: unknown
+) => void;
+
 export function countChargeableQuota(logs: QuotaLogData[], now: number): number {
   return logs.filter((log) => {
     if (log.status === 'failed') return false;
@@ -41,4 +46,29 @@ export async function settleQuotaReservation(
   }
 
   throw lastError;
+}
+
+export async function executeWithQuotaReservation<T>(
+  reference: QuotaReservationReference,
+  generate: () => Promise<T>,
+  onSettlementError: QuotaSettlementErrorHandler = () => undefined
+): Promise<T> {
+  let result: T;
+  try {
+    result = await generate();
+  } catch (generationError) {
+    try {
+      await settleQuotaReservation(reference, 'failed');
+    } catch (settlementError) {
+      onSettlementError('failed', settlementError);
+    }
+    throw generationError;
+  }
+
+  try {
+    await settleQuotaReservation(reference, 'succeeded');
+  } catch (settlementError) {
+    onSettlementError('succeeded', settlementError);
+  }
+  return result;
 }

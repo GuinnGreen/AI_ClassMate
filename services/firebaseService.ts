@@ -290,7 +290,15 @@ export const getTodayAiGenerationCount = async (userUid: string): Promise<number
   startOfToday.setHours(0, 0, 0, 0);
   const q = query(logRef, where('timestamp', '>=', startOfToday.getTime()));
   const snapshot = await getDocs(q);
-  return snapshot.size;
+  const now = Date.now();
+  return snapshot.docs.filter((log) => {
+    const data = log.data();
+    if (data.status === 'failed') return false;
+    if (data.status === 'reserved') {
+      return typeof data.reservationExpiresAt !== 'number' || data.reservationExpiresAt > now;
+    }
+    return true;
+  }).length;
 };
 
 export const logCommentEdit = async (

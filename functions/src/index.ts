@@ -6,8 +6,8 @@ import { getFirestore } from "firebase-admin/firestore";
 import { routeTextGeneration, routeVisionGeneration } from "./llmRouter";
 import {
   countChargeableQuota,
+  executeWithQuotaReservation,
   QUOTA_RESERVATION_TTL_MS,
-  settleQuotaReservation,
 } from "./quotaReservation";
 
 initializeApp();
@@ -88,22 +88,19 @@ export const generateText = onCall(
       hasCustomPrompt: req.data?.hasCustomPrompt ?? false,
     });
 
-    try {
-      const text = await routeTextGeneration(prompt, {
+    const text = await executeWithQuotaReservation(
+      logRef,
+      () => routeTextGeneration(prompt, {
         geminiKeysCsv: GEMINI_API_KEY.value(),
         groqApiKey: GROQ_API_KEY.value(),
         openrouterApiKey: OPENROUTER_API_KEY.value(),
-      });
-      await settleQuotaReservation(logRef, "succeeded");
-      return { text };
-    } catch (err) {
-      try {
-        await settleQuotaReservation(logRef, "failed");
-      } catch (settlementError) {
-        console.error("[generateText] 配額失敗狀態寫入失敗；預留將自動逾時", settlementError);
-      }
-      throw err;
-    }
+      }),
+      (status, error) => console.error(
+        `[generateText] 配額 ${status} 狀態寫入失敗；預留將自動逾時`,
+        error
+      )
+    );
+    return { text };
   }
 );
 
@@ -138,21 +135,18 @@ export const parseSchedule = onCall(
 
     const logRef = await reserveQuota(uid, "schedule_recognize");
 
-    try {
-      const text = await routeVisionGeneration(prompt, base64Data, mimeType, {
+    const text = await executeWithQuotaReservation(
+      logRef,
+      () => routeVisionGeneration(prompt, base64Data, mimeType, {
         geminiKeysCsv: GEMINI_API_KEY.value(),
         groqApiKey: GROQ_API_KEY.value(),
         openrouterApiKey: OPENROUTER_API_KEY.value(),
-      });
-      await settleQuotaReservation(logRef, "succeeded");
-      return { text };
-    } catch (err) {
-      try {
-        await settleQuotaReservation(logRef, "failed");
-      } catch (settlementError) {
-        console.error("[parseSchedule] 配額失敗狀態寫入失敗；預留將自動逾時", settlementError);
-      }
-      throw err;
-    }
+      }),
+      (status, error) => console.error(
+        `[parseSchedule] 配額 ${status} 狀態寫入失敗；預留將自動逾時`,
+        error
+      )
+    );
+    return { text };
   }
 );
