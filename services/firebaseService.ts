@@ -165,12 +165,12 @@ export const saveStudentNote = async (
   userUid: string,
   studentId: string,
   currentDate: string,
-  currentDayRecord: DailyRecord,
+  _currentDayRecord: DailyRecord,
   note: string
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
   await updateDoc(studentRef, {
-    [`dailyRecords.${currentDate}`]: { points: currentDayRecord.points, note, absence: currentDayRecord.absence ?? null }
+    [`dailyRecords.${currentDate}.note`]: note,
   });
 };
 

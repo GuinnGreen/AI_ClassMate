@@ -331,6 +331,7 @@ export const StudentDetailWorkspace = ({
     setIsSyncing(true);
     syncAbortRef.current = false;
     let failedCount = 0;
+    let completedCount = 0;
     for (const targetId of syncTargetIds) {
       // 切換學生時中止後續寫入，避免用過期的 tempNote 繼續同步
       if (syncAbortRef.current) break;
@@ -343,6 +344,7 @@ export const StudentDetailWorkspace = ({
         : tempNote;
       try {
         await saveStudentNote(userUid, targetId, currentDate, targetDayRecord, mergedNote);
+        completedCount++;
       } catch (err) {
         console.error('[handleSyncNote] failed for', targetId, err);
         failedCount++;
@@ -353,7 +355,7 @@ export const StudentDetailWorkspace = ({
     setSyncTargetIds(new Set());
     setIsNoteModalOpen(false);
     if (failedCount > 0) showError(`同步註記失敗 ${failedCount} 位`);
-    else if (syncTargetIds.size > 0) showSuccess(`已同步至 ${syncTargetIds.size} 位學生`);
+    else if (completedCount > 0) showSuccess(`已同步至 ${completedCount} 位學生`);
   };
 
   const todayAbsence = (student.dailyRecords[currentDate] || { absence: null }).absence ?? null;
@@ -401,6 +403,13 @@ export const StudentDetailWorkspace = ({
   useEffect(() => {
     if (prevStudentId.current !== student.id) {
       syncAbortRef.current = true; // 中止進行中的註記同步
+      setIsNoteModalOpen(false);
+      setTempNote('');
+      setNoteSyncMode(false);
+      setSyncTargetIds(new Set());
+      setShowPasswordModal(false);
+      setVerifyPasswordVal('');
+      setVerifyError('');
       setTempComment(student.comment);
       setOriginalAiText(student.originalAiComment || '');
       prevStudentId.current = student.id;

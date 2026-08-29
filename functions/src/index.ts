@@ -4,6 +4,11 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { routeTextGeneration, routeVisionGeneration } from "./llmRouter";
+import {
+  countChargeableQuota,
+  QUOTA_RESERVATION_TTL_MS,
+  settleQuotaReservation,
+} from "./quotaReservation";
 
 initializeApp();
 const db = getFirestore();
@@ -38,30 +43,25 @@ async function reserveQuota(
   const startOfDayMs = new Date().setHours(0, 0, 0, 0);
 
   return db.runTransaction(async (t) => {
-    const countSnap = await t.get(
-      logsRef.where("timestamp", ">=", startOfDayMs).count()
-    );
-    if (countSnap.data().count >= DAILY_QUOTA) {
+    const now = Date.now();
+    const logsSnap = await t.get(logsRef.where("timestamp", ">=", startOfDayMs));
+    const count = countChargeableQuota(logsSnap.docs.map((doc) => doc.data()), now);
+    if (count >= DAILY_QUOTA) {
       throw new HttpsError(
         "resource-exhausted",
         `每日 AI 使用配額已達上限（${DAILY_QUOTA} 次）`
       );
     }
     const logRef = logsRef.doc();
-    t.set(logRef, { type, timestamp: Date.now(), ...extra });
+    t.set(logRef, {
+      ...extra,
+      type,
+      timestamp: now,
+      status: "reserved",
+      reservationExpiresAt: now + QUOTA_RESERVATION_TTL_MS,
+    });
     return logRef;
   });
-}
-
-// LLM 呼叫失敗時退還已預留的配額
-async function refundQuota(
-  logRef: FirebaseFirestore.DocumentReference
-): Promise<void> {
-  try {
-    await logRef.delete();
-  } catch (err) {
-    console.error("[refundQuota] 配額退還失敗", err);
-  }
 }
 
 // ---- Callable: generateText（評語生成） ----
@@ -94,9 +94,14 @@ export const generateText = onCall(
         groqApiKey: GROQ_API_KEY.value(),
         openrouterApiKey: OPENROUTER_API_KEY.value(),
       });
+      await settleQuotaReservation(logRef, "succeeded");
       return { text };
     } catch (err) {
-      await refundQuota(logRef);
+      try {
+        await settleQuotaReservation(logRef, "failed");
+      } catch (settlementError) {
+        console.error("[generateText] 配額失敗狀態寫入失敗；預留將自動逾時", settlementError);
+      }
       throw err;
     }
   }
@@ -139,9 +144,14 @@ export const parseSchedule = onCall(
         groqApiKey: GROQ_API_KEY.value(),
         openrouterApiKey: OPENROUTER_API_KEY.value(),
       });
+      await settleQuotaReservation(logRef, "succeeded");
       return { text };
     } catch (err) {
-      await refundQuota(logRef);
+      try {
+        await settleQuotaReservation(logRef, "failed");
+      } catch (settlementError) {
+        console.error("[parseSchedule] 配額失敗狀態寫入失敗；預留將自動逾時", settlementError);
+      }
       throw err;
     }
   }
