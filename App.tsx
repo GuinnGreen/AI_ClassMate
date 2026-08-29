@@ -21,6 +21,7 @@ import {
 } from './services/firebaseService';
 
 import { useAppUpdate } from './hooks/useAppUpdate';
+import { EnvironmentBanner } from './components/EnvironmentBanner';
 import { UpdateBanner } from './components/UpdateBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FontStyles } from './components/FontStyles';
@@ -36,6 +37,7 @@ import { TeacherToolbar } from './components/TeacherToolbar';
 export default function App() {
   return (
     <ToastProvider>
+      <EnvironmentBanner />
       <AppInner />
     </ToastProvider>
   );
