@@ -50,7 +50,7 @@ The original Guide checkout was inspected read-only. Its pre-existing user-owned
 
 ## External Configuration Status
 
-Remote `GUIDE_REF` remains unset and deferred. Its pending exact value is `2b5c146dd117508877f86d97da2f9d0c37c2d54f`, to be configured only after that Guide revision is published. Until then, the workflow correctly fails closed rather than resolving a floating Guide revision.
+This work did not inspect or mutate remote `GUIDE_REF`. Its pending intended value is `2b5c146dd117508877f86d97da2f9d0c37c2d54f`, to be configured only after that Guide revision is published. Until that sequence is completed, the strengthened workflow is designed to fail closed if the variable is missing, invalid, or unresolvable.
 
 ## Deferred to Workstream B
 
