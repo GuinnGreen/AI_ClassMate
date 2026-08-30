@@ -3,8 +3,10 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
+    "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
+    "verify": "npm run typecheck && npm run test:run && npm run build",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",

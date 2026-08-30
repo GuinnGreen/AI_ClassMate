@@ -4,6 +4,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { routeTextGeneration, routeVisionGeneration } from "./llmRouter";
+import { validateScheduleInput } from "./inputValidation";
 import {
   countChargeableQuota,
   executeWithQuotaReservation,
@@ -21,16 +22,6 @@ const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 const OPENROUTER_API_KEY = defineSecret("OPENROUTER_API_KEY");
 
 const DAILY_QUOTA = 30;
-
-// Gemini Vision 支援的影像格式（PDF 已在前端轉為 image/png）
-const ALLOWED_IMAGE_MIMES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "image/heic",
-  "image/heif",
-];
 
 // ---- 共用：配額預留（transaction 內檢查 + 寫 log，杜絕檢查與計數間的空窗） ----
 // timestamp 用 Date.now() 毫秒數字（與前端 getTodayAiGenerationCount 對齊）
@@ -118,20 +109,7 @@ export const parseSchedule = onCall(
     }
     const uid = req.auth.uid;
 
-    const prompt = (req.data?.prompt as string | undefined)?.trim();
-    const base64Data = req.data?.base64Data as string | undefined;
-    const mimeType = req.data?.mimeType as string | undefined;
-
-    if (!prompt || !base64Data || !mimeType) {
-      throw new HttpsError("invalid-argument", "缺少必要參數");
-    }
-    if (!ALLOWED_IMAGE_MIMES.includes(mimeType)) {
-      throw new HttpsError("invalid-argument", `不支援的影像格式：${mimeType}`);
-    }
-    // base64 size limit: ~5MB raw → ~6.7MB base64
-    if (base64Data.length > 7_000_000) {
-      throw new HttpsError("invalid-argument", "圖片過大（請壓縮至 5MB 以下）");
-    }
+    const { prompt, base64Data, mimeType } = validateScheduleInput(req.data);
 
     const logRef = await reserveQuota(uid, "schedule_recognize");
 
