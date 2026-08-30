@@ -12,12 +12,12 @@
 
 - Main application pre-evidence source: `01086ef539d6242c5a11fd4d60734c7f9b26c009`
 - Main application Workstream A range: `cd2b2ed3f293eaadda77ceccf013457e615ade7e..01086ef539d6242c5a11fd4d60734c7f9b26c009`
-- Isolated Guide revision: `7dee0b8e721a865da8f7a72cc22471f37d1afd94`
-- Guide safety range: `bba701c..7dee0b8e721a865da8f7a72cc22471f37d1afd94`
+- Isolated Guide revision: `30966f4a56492af09353da300dcf3936ae63f607`
+- Guide safety range: `bba701c..30966f4a56492af09353da300dcf3936ae63f607`
 
-The main-range commits add transactional point/note protections and quota-reservation safeguards; add runtime, Rules, callable-validation, browser, and Guide-capture safety tests; generate the release manifest; and harden the Pages workflow. The four Guide commits add the capture guard, deterministic local Auth provisioning, nonzero CLI failure handling, and fail-closed WebP encoding. The final Main corrections complete shared-counter serialization and refresh browser quota state at the server-defined Taiwan-day boundary without claiming the deferred server-only audit/Rules work.
+The main-range commits add transactional point/note protections and quota-reservation safeguards; add runtime, Rules, callable-validation, browser, and Guide-capture safety tests; generate the release manifest; and harden the Pages workflow. The five Guide commits add the capture guard, deterministic local Auth provisioning, nonzero CLI failure handling, fail-closed WebP encoding, and atomic replacement of verified capture artifacts. The final Main corrections complete shared-counter serialization and refresh browser quota state at the server-defined Taiwan-day boundary without claiming the deferred server-only audit/Rules work.
 
-Main commit list: `3297806`, `f9ba908`, `e8d53f5`, `283f56f`, `f9fa6d0`, `abf973e`, `72ded9a`, `d38b0d5`, `2eb1cef`, `39d45d1`, `e44f7b2`, `a7d3daa`, `aff6e7b`, `2a00377`, `0a3a656`, `303f7ee`, `f2f1d00`, `fdfd6ff`, and `01086ef`. Guide commit list: `4795cce`, `2b5c146`, `f69f40b`, and `7dee0b8`.
+Main commit list: `3297806`, `f9ba908`, `e8d53f5`, `283f56f`, `f9fa6d0`, `abf973e`, `72ded9a`, `d38b0d5`, `2eb1cef`, `39d45d1`, `e44f7b2`, `a7d3daa`, `aff6e7b`, `2a00377`, `0a3a656`, `303f7ee`, `f2f1d00`, `fdfd6ff`, and `01086ef`. Guide commit list: `4795cce`, `2b5c146`, `f69f40b`, `7dee0b8`, and `30966f4`.
 
 ## Commands and Results
 
@@ -30,7 +30,7 @@ All commands used Node `v20.20.2` through the local Node 20 wrapper.
 | `npm --prefix functions run verify` | Pass: 2 test files, 11 tests; typecheck and build completed. |
 | `npm --prefix functions run test:emulator:quota` | Pass under the isolated emulator: 1 real-concurrency test covering the 28/30 boundary, failed-use refund, replacement, and server-timestamp quota snapshot. |
 | `npm run test:e2e` | Pass: 4 desktop/mobile smoke tests. |
-| `npm --prefix guide run verify` | Pass: typecheck, 12 capture-safety tests, and production build. |
+| `npm --prefix guide run verify` | Pass: typecheck, 13 capture-safety tests, and production build. |
 
 The main build retained its pre-existing large-chunk advisory; it did not affect the successful exit status.
 
@@ -51,7 +51,7 @@ The original Guide checkout was inspected read-only. Its pre-existing user-owned
 
 ## External Configuration Status
 
-This work did not inspect or mutate remote `GUIDE_REF`. Its pending intended value is `7dee0b8e721a865da8f7a72cc22471f37d1afd94`, to be configured only after that exact Guide revision is published. Until that sequence is completed, the strengthened workflow is designed to fail closed if the variable is missing, invalid, or unresolvable.
+This work did not inspect or mutate remote `GUIDE_REF`. Its pending intended value is `30966f4a56492af09353da300dcf3936ae63f607`, to be configured only after that exact Guide revision is published. Until that sequence is completed, the strengthened workflow is designed to fail closed if the variable is missing, invalid, or unresolvable.
 
 ## Deferred to Workstream B
 
