@@ -128,6 +128,24 @@ npm run dev
 
 開啟瀏覽器訪問 `http://localhost:3000` 即可使用。
 
+### Safe local Firebase development
+
+Run Firebase emulators in one terminal:
+
+    npm run emulators
+
+Run the Vite app with emulator configuration in another terminal:
+
+    npm run dev -- --mode test
+
+Run Firestore Rules tests:
+
+    npm run test:rules
+
+The emulator project is always `demo-classmate-ai`. Do not run seed, capture, migration, or destructive scripts with production Firebase configuration.
+
+Staging credentials are not stored in the repository. A staging environment must set `VITE_APP_ENV=staging`, `VITE_ALLOW_REMOTE_FIREBASE=true`, `VITE_USE_FIREBASE_EMULATORS=false`, and a `VITE_FIREBASE_PROJECT_ID` different from `ai-teacher-classroom`; the runtime guard rejects the production project ID.
+
 ---
 
 ## 部署到 GitHub Pages

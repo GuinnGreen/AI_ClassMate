@@ -9,6 +9,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
+    "emulators": "firebase emulators:start --project demo-classmate-ai --only auth,firestore,functions",
+    "test:rules:run": "vitest run --config vitest.rules.config.ts",
+    "test:rules": "firebase emulators:exec --project demo-classmate-ai --only firestore \"npm run test:rules:run\"",
     "verify": "npm run typecheck && npm run test:run && npm run build",
     "preview": "vite preview"
   },
