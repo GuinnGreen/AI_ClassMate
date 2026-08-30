@@ -3,6 +3,11 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:emulator:quota": "vitest run --config vitest.emulator.config.mts",
+    "verify": "npm run typecheck && npm run test:run && npm run build",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
@@ -19,7 +24,8 @@
     "firebase-functions": "^6.1.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.11"
   },
   "private": true
 }

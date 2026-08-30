@@ -13,9 +13,11 @@ import {
   query,
   where,
   getDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential, User } from 'firebase/auth';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule, DailyRecord, AbsenceType, Announcement, PrizeItem, CorrectionItem } from '../types';
 
 // --- Student CRUD ---
@@ -62,10 +64,20 @@ export const addPointToStudent = async (
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
   const newPoint: PointLog = { id: crypto.randomUUID(), label: behavior.label, value: behavior.value, timestamp: Date.now() };
-  const updatedPoints = [...currentDayRecord.points, newPoint];
-  await updateDoc(studentRef, {
-    totalScore: increment(behavior.value),
-    [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note, absence: currentDayRecord.absence ?? null }
+  // 以 transaction 讀取伺服器最新當日紀錄，避免多裝置同時操作時互相覆蓋
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(studentRef);
+    if (!snap.exists()) throw new Error('學生資料不存在');
+    const serverRecord: DailyRecord =
+      (snap.data().dailyRecords?.[currentDate] as DailyRecord | undefined) ?? currentDayRecord;
+    transaction.update(studentRef, {
+      totalScore: increment(behavior.value),
+      [`dailyRecords.${currentDate}`]: {
+        points: [...serverRecord.points, newPoint],
+        note: serverRecord.note,
+        absence: serverRecord.absence ?? null,
+      },
+    });
   });
 };
 
@@ -75,37 +87,71 @@ export const addPointToAllStudents = async (
   currentDate: string,
   behavior: { label: string; value: number }
 ): Promise<number> => {
-  const batch = writeBatch(db);
-  let count = 0;
-  for (const student of students) {
-    const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
-    if (currentDayRecord.absence) continue;
-    const studentRef = doc(db, `users/${userUid}/students/${student.id}`);
-    const newPoint: PointLog = { id: crypto.randomUUID(), label: behavior.label, value: behavior.value, timestamp: Date.now() };
-    const updatedPoints = [...currentDayRecord.points, newPoint];
-    batch.update(studentRef, {
-      totalScore: increment(behavior.value),
-      [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note, absence: currentDayRecord.absence ?? null }
-    });
-    count++;
-  }
-  await batch.commit();
-  return count;
+  const studentRefs = students.map(student =>
+    doc(db, `users/${userUid}/students/${student.id}`)
+  );
+
+  return runTransaction(db, async (transaction) => {
+    // Firestore requires all transaction reads before writes. Reading every class member
+    // first also preserves the previous all-or-nothing batch behavior for normal class sizes.
+    const snapshots = [];
+    for (const studentRef of studentRefs) {
+      snapshots.push(await transaction.get(studentRef));
+    }
+
+    let count = 0;
+    for (let index = 0; index < snapshots.length; index++) {
+      const snapshot = snapshots[index];
+      if (!snapshot.exists()) throw new Error('學生資料不存在');
+      const data = snapshot.data() as Student;
+      const serverRecord = data.dailyRecords?.[currentDate];
+      if (serverRecord?.absence) continue;
+
+      const newPoint: PointLog = {
+        id: crypto.randomUUID(),
+        label: behavior.label,
+        value: behavior.value,
+        timestamp: Date.now(),
+      };
+      transaction.update(studentRefs[index], {
+        totalScore: (data.totalScore ?? 0) + behavior.value,
+        [`dailyRecords.${currentDate}`]: {
+          ...(serverRecord ?? {}),
+          points: [...(serverRecord?.points ?? []), newPoint],
+        },
+      });
+      count++;
+    }
+    return count;
+  });
 };
 
 export const deletePointFromStudent = async (
   userUid: string,
   studentId: string,
   currentDate: string,
-  currentDayRecord: DailyRecord,
+  _currentDayRecord: DailyRecord,
   pointId: string,
-  pointValue: number
+  _pointValue: number
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
-  const updatedPoints = currentDayRecord.points.filter(p => p.id !== pointId);
-  await updateDoc(studentRef, {
-    totalScore: increment(-pointValue),
-    [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note, absence: currentDayRecord.absence ?? null }
+  // 以 transaction 讀取伺服器最新紀錄：扣分金額以伺服器上該筆 point 為準，
+  // 若該筆已被其他裝置刪除則直接略過，避免重複扣分
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(studentRef);
+    if (!snap.exists()) throw new Error('學生資料不存在');
+    const serverRecord = snap.data().dailyRecords?.[currentDate] as DailyRecord | undefined;
+    if (!serverRecord) return;
+    const targetPoint = serverRecord.points.find(p => p.id === pointId);
+    if (!targetPoint) return;
+    transaction.update(studentRef, {
+      totalScore: increment(-targetPoint.value),
+      [`dailyRecords.${currentDate}`]: {
+        points: serverRecord.points.filter(p => p.id !== pointId),
+        note: serverRecord.note,
+        absence: serverRecord.absence ?? null,
+      },
+    });
   });
 };
 
@@ -141,12 +187,32 @@ export const saveStudentNote = async (
   userUid: string,
   studentId: string,
   currentDate: string,
-  currentDayRecord: DailyRecord,
+  _currentDayRecord: DailyRecord,
   note: string
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
   await updateDoc(studentRef, {
-    [`dailyRecords.${currentDate}`]: { points: currentDayRecord.points, note, absence: currentDayRecord.absence ?? null }
+    [`dailyRecords.${currentDate}.note`]: note,
+  });
+};
+
+export const appendStudentNote = async (
+  userUid: string,
+  studentId: string,
+  currentDate: string,
+  note: string,
+) => {
+  const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(studentRef);
+    if (!snapshot.exists()) throw new Error('學生資料不存在');
+    const serverRecord = snapshot.data().dailyRecords?.[currentDate] as DailyRecord | undefined;
+    const serverNote = serverRecord?.note?.trim() ?? '';
+    transaction.update(studentRef, {
+      [`dailyRecords.${currentDate}.note`]: serverNote
+        ? `${serverNote}\n---\n${note}`
+        : note,
+    });
   });
 };
 
@@ -154,16 +220,12 @@ export const setStudentAbsence = async (
   userUid: string,
   studentId: string,
   currentDate: string,
-  currentDayRecord: DailyRecord,
+  _currentDayRecord: DailyRecord,
   absence: AbsenceType | null
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
   await updateDoc(studentRef, {
-    [`dailyRecords.${currentDate}`]: {
-      points: currentDayRecord.points,
-      note: currentDayRecord.note,
-      absence,
-    }
+    [`dailyRecords.${currentDate}.absence`]: absence,
   });
 };
 
@@ -257,16 +319,48 @@ export const updatePrizes = async (
 // --- Research Logging ---
 // 注：logAiGeneration 與 logScheduleRecognition 已遷移至 Cloud Functions
 // (functions/src/index.ts 的 generateText / parseSchedule callable 內部寫 logs)
-// 前端 firestore.rules 已禁止 logs 寫入以防雙重計數失效 rate limit
+// Workstream A 由使用者子樹外的伺服器 counter 強制執行配額；既有 logs 保留供稽核與 UI 相容。
+// 將 logs 改為伺服器專用的 Rules 強化仍屬 Workstream B。
 
-// 查詢今日 AI 使用次數（rate limiting 用，前端只讀不寫）
+export interface AiQuotaUsageSnapshot {
+  used: number;
+  limit: number;
+  dayKey: string;
+  startMs: number;
+  endMs: number;
+  serverNowMs: number;
+}
+
+// 由後端 callable 依 Asia/Taipei 配額日回傳 counter 與日界線；前端不自行推算日期。
+export const getAiQuotaUsageSnapshot = async (userUid: string): Promise<AiQuotaUsageSnapshot> => {
+  if (!userUid) {
+    throw new Error('缺少使用者識別，無法讀取 AI 配額');
+  }
+  const readQuotaUsage = httpsCallable<
+    Record<string, never>,
+    AiQuotaUsageSnapshot
+  >(functions, 'getAiQuotaUsage');
+  const result = await readQuotaUsage({});
+  const usage = result.data;
+  if (
+    !Number.isFinite(usage.used) || usage.used < 0
+    || !Number.isFinite(usage.limit) || usage.limit <= 0
+    || !/^\d{4}-\d{2}-\d{2}$/.test(usage.dayKey)
+    || !Number.isFinite(usage.startMs)
+    || !Number.isFinite(usage.endMs)
+    || !Number.isFinite(usage.serverNowMs)
+    || usage.startMs >= usage.endMs
+    || usage.serverNowMs < usage.startMs
+    || usage.serverNowMs >= usage.endMs
+  ) {
+    throw new Error('後端回傳無效的 AI 配額用量');
+  }
+  return usage;
+};
+
 export const getTodayAiGenerationCount = async (userUid: string): Promise<number> => {
-  const logRef = collection(db, `users/${userUid}/logs`);
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const q = query(logRef, where('timestamp', '>=', startOfToday.getTime()));
-  const snapshot = await getDocs(q);
-  return snapshot.size;
+  if (!userUid) return 0;
+  return (await getAiQuotaUsageSnapshot(userUid)).used;
 };
 
 export const logCommentEdit = async (

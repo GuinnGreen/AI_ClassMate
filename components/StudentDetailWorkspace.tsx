@@ -16,6 +16,7 @@ import {
   toggleStudentTag,
   updateStudentComment,
   saveStudentNote,
+  appendStudentNote,
   setStudentAbsence,
   updateCustomBehaviors,
   updatePrizes,
@@ -74,10 +75,12 @@ export const StudentDetailWorkspace = ({
   const [noteSyncMode, setNoteSyncMode] = useState(false);
   const [syncTargetIds, setSyncTargetIds] = useState<Set<string>>(new Set());
   const [isSyncing, setIsSyncing] = useState(false);
+  const syncAbortRef = useRef(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [verifyPasswordVal, setVerifyPasswordVal] = useState('');
   const [verifyError, setVerifyError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const verificationRequestRef = useRef(0);
   const [pendingAction, setPendingAction] = useState<'notes' | 'export' | 'ai'>('notes');
 
   // Behavior Settings Modal
@@ -290,10 +293,12 @@ export const StudentDetailWorkspace = ({
   // --- Secure Verification Logic ---
   const handleVerifyPassword = async () => {
     if (!auth.currentUser) return;
+    const requestId = ++verificationRequestRef.current;
     setIsVerifying(true);
     setVerifyError('');
     try {
       await verifyPassword(auth.currentUser, verifyPasswordVal);
+      if (requestId !== verificationRequestRef.current) return;
       setShowPasswordModal(false);
       setVerifyPasswordVal('');
       if (pendingAction === 'export') {
@@ -306,9 +311,9 @@ export const StudentDetailWorkspace = ({
         setIsNoteModalOpen(true);
       }
     } catch {
-      setVerifyError('密碼錯誤');
+      if (requestId === verificationRequestRef.current) setVerifyError('密碼錯誤');
     } finally {
-      setIsVerifying(false);
+      if (requestId === verificationRequestRef.current) setIsVerifying(false);
     }
   };
 
@@ -328,17 +333,17 @@ export const StudentDetailWorkspace = ({
 
   const handleSyncNote = async () => {
     setIsSyncing(true);
+    syncAbortRef.current = false;
     let failedCount = 0;
+    let completedCount = 0;
     for (const targetId of syncTargetIds) {
+      // 切換學生時中止後續寫入，避免用過期的 tempNote 繼續同步
+      if (syncAbortRef.current) break;
       const target = students.find(s => s.id === targetId);
       if (!target) continue;
-      const targetDayRecord = target.dailyRecords[currentDate] || { points: [], note: '', absence: null };
-      const existingNote = targetDayRecord.note?.trim() || '';
-      const mergedNote = existingNote
-        ? `${existingNote}\n---\n${tempNote}`
-        : tempNote;
       try {
-        await saveStudentNote(userUid, targetId, currentDate, targetDayRecord, mergedNote);
+        await appendStudentNote(userUid, targetId, currentDate, tempNote);
+        completedCount++;
       } catch (err) {
         console.error('[handleSyncNote] failed for', targetId, err);
         failedCount++;
@@ -349,7 +354,7 @@ export const StudentDetailWorkspace = ({
     setSyncTargetIds(new Set());
     setIsNoteModalOpen(false);
     if (failedCount > 0) showError(`同步註記失敗 ${failedCount} 位`);
-    else if (syncTargetIds.size > 0) showSuccess(`已同步至 ${syncTargetIds.size} 位學生`);
+    else if (completedCount > 0) showSuccess(`已同步至 ${completedCount} 位學生`);
   };
 
   const todayAbsence = (student.dailyRecords[currentDate] || { absence: null }).absence ?? null;
@@ -388,6 +393,7 @@ export const StudentDetailWorkspace = ({
   useEffect(() => {
     return () => {
       clearTimers();
+      syncAbortRef.current = true;
       if (copyTimeoutRef.current) { clearTimeout(copyTimeoutRef.current); copyTimeoutRef.current = null; }
     };
   }, [clearTimers]);
@@ -395,6 +401,16 @@ export const StudentDetailWorkspace = ({
   const prevStudentId = useRef(student.id);
   useEffect(() => {
     if (prevStudentId.current !== student.id) {
+      syncAbortRef.current = true; // 中止進行中的註記同步
+      verificationRequestRef.current++;
+      setIsNoteModalOpen(false);
+      setTempNote('');
+      setNoteSyncMode(false);
+      setSyncTargetIds(new Set());
+      setShowPasswordModal(false);
+      setVerifyPasswordVal('');
+      setVerifyError('');
+      setIsVerifying(false);
       setTempComment(student.comment);
       setOriginalAiText(student.originalAiComment || '');
       prevStudentId.current = student.id;
