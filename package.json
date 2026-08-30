@@ -14,6 +14,7 @@
     "emulators": "firebase emulators:start --project demo-classmate-ai --only auth,firestore,functions",
     "test:rules:run": "vitest run --config vitest.rules.config.ts",
     "test:rules": "firebase emulators:exec --project demo-classmate-ai --only firestore \"npm run test:rules:run\"",
+    "release:manifest": "tsx scripts/generate-release-manifest.mjs",
     "verify": "npm run typecheck && npm run test:run && npm run build",
     "preview": "vite preview"
   },
@@ -40,6 +41,7 @@
     "firebase-tools": "^15.28.2",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4.1.18",
+    "tsx": "^4.23.13",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vitest": "^4.1.11"
