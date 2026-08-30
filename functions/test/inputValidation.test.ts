@@ -35,6 +35,13 @@ describe('validateScheduleInput', () => {
     }, '缺少必要參數');
   });
 
+  it('rejects payloads with missing base64 data', () => {
+    expectInvalidArgument({
+      prompt: '辨識課表',
+      mimeType: 'image/png',
+    }, '缺少必要參數');
+  });
+
   it('rejects unsupported MIME types', () => {
     expectInvalidArgument({
       prompt: '辨識課表',
