@@ -17,16 +17,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main app
         uses: actions/checkout@v4
 
-      - name: Checkout guide site
+      - name: Require pinned guide revision
+        env:
+          GUIDE_REF: ${{ vars.GUIDE_REF }}
+        run: |
+          if [[ ! "$GUIDE_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "GUIDE_REF must be a reviewed 40-character lowercase commit SHA." >&2
+            exit 1
+          fi
+
+      - name: Checkout pinned guide site
         uses: actions/checkout@v4
         with:
           repository: GuinnGreen/AI_ClassMate_guide
+          ref: ${{ vars.GUIDE_REF }}
+          path: _guide_repo
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install main app dependencies
+        run: npm ci
+
+      - name: Verify main app
+        run: npm run verify
+
+      - name: Verify Firestore Rules
+        run: npm run test:rules
+
+      - name: Install and verify Functions
+        run: npm ci --prefix functions && npm --prefix functions run verify
+
+      - name: Install and verify Guide
+        working-directory: _guide_repo/guide
+        run: npm ci && npm run verify
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser smoke tests
+        run: npm run test:e2e
+
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main app
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned guide site
+        uses: actions/checkout@v4
+        with:
+          repository: GuinnGreen/AI_ClassMate_guide
+          ref: ${{ vars.GUIDE_REF }}
           path: _guide_repo
 
       - name: Setup Node
@@ -37,19 +89,21 @@ jobs:
       - name: Install main app dependencies
         run: npm ci
 
-      - name: Write version file
+      - name: Write release manifest
         run: |
           BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          echo "{\"buildTime\":\"$BUILD_TIME\"}" > public/version.json
-          echo "BUILD_TIME=$BUILD_TIME" >> $GITHUB_ENV
+          GUIDE_COMMIT=$(git -C _guide_repo rev-parse HEAD)
+          RULES_HASH=$(sha256sum firestore.rules | cut -d' ' -f1)
+          APP_COMMIT="$GITHUB_SHA" GUIDE_COMMIT="$GUIDE_COMMIT" RULES_HASH="$RULES_HASH" BUILD_TIME="$BUILD_TIME" npm run release:manifest
+          echo "BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
 
       - name: Build main app
         run: npm run build
         env:
           VITE_APP_BUILD_TIME: ${{ env.BUILD_TIME }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          VITE_APP_ENV: production
+          VITE_USE_FIREBASE_EMULATORS: 'false'
+          VITE_ALLOW_REMOTE_FIREBASE: 'true'
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}

@@ -183,6 +183,12 @@ export default defineConfig({
 
 Push 到 `main` 分支後，GitHub Actions 會自動建置並部署。
 
+### Release identity
+
+`public/version.json` records the exact app and Guide revisions used by the Pages artifact. Cloud Functions and Firestore Rules are labeled `external` because this Pages workflow does not deploy them. A release manifest is evidence of source identity, not proof of live Firebase deployment parity.
+
+The `GUIDE_REF` GitHub repository variable must contain a reviewed 40-character commit SHA from `GuinnGreen/AI_ClassMate_guide`.
+
 ---
 
 ## License
