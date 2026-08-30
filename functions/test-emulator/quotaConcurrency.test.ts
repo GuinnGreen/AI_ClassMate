@@ -86,6 +86,7 @@ describe('serialized daily quota reservations', () => {
       dayKey: window.dayKey,
       startMs: window.startMs,
       endMs: window.endMs,
+      serverNowMs: NOW,
     });
     const counter = await db.doc(`aiQuotaCounters/${UID}/days/${window.dayKey}`).get();
     expect(counter.exists).toBe(true);

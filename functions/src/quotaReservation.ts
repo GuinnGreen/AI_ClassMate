@@ -50,6 +50,7 @@ export interface QuotaReservationHandle extends QuotaReservationReference {
 export interface QuotaUsage extends QuotaWindow {
   used: number;
   limit: number;
+  serverNowMs: number;
 }
 
 interface QuotaCounterState {
@@ -204,7 +205,7 @@ export async function getQuotaUsage(
     return pruned.state.used;
   });
 
-  return { ...window, used, limit: DAILY_QUOTA };
+  return { ...window, used, limit: DAILY_QUOTA, serverNowMs: now };
 }
 
 function createReservationHandle(

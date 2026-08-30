@@ -72,13 +72,15 @@ vi.mock('firebase/functions', () => ({
 
 vi.mock('../../firebase', () => ({ db: {}, functions: callable.functions }));
 
-import {
+import * as firebaseService from '../../services/firebaseService';
+
+const {
   addPointToAllStudents,
   appendStudentNote,
   getTodayAiGenerationCount,
   saveStudentNote,
   setStudentAbsence,
-} from '../../services/firebaseService';
+} = firebaseService;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -295,6 +297,30 @@ describe('competing student writes', () => {
 });
 
 describe('getTodayAiGenerationCount', () => {
+  it('exposes the complete authoritative quota window for rollover scheduling', async () => {
+    callable.getQuotaUsage.mockResolvedValue({
+      data: {
+        used: 30,
+        limit: 30,
+        dayKey: '2026-08-30',
+        startMs: Date.parse('2026-08-29T16:00:00.000Z'),
+        endMs: Date.parse('2026-08-30T16:00:00.000Z'),
+        serverNowMs: Date.parse('2026-08-30T15:59:59.000Z'),
+      },
+    });
+    const readSnapshot = Reflect.get(firebaseService, 'getAiQuotaUsageSnapshot');
+
+    expect(readSnapshot).toBeTypeOf('function');
+    await expect(readSnapshot('teacher-1')).resolves.toEqual({
+      used: 30,
+      limit: 30,
+      dayKey: '2026-08-30',
+      startMs: Date.parse('2026-08-29T16:00:00.000Z'),
+      endMs: Date.parse('2026-08-30T16:00:00.000Z'),
+      serverNowMs: Date.parse('2026-08-30T15:59:59.000Z'),
+    });
+  });
+
   it('uses the authoritative callable without sending a device-local date boundary', async () => {
     callable.getQuotaUsage.mockResolvedValue({
       data: {
@@ -303,6 +329,7 @@ describe('getTodayAiGenerationCount', () => {
         dayKey: '2026-08-30',
         startMs: Date.parse('2026-08-29T16:00:00.000Z'),
         endMs: Date.parse('2026-08-30T16:00:00.000Z'),
+        serverNowMs: Date.parse('2026-08-30T12:00:00.000Z'),
       },
     });
     firestore.getDocs.mockResolvedValue({ docs: [] });
@@ -320,6 +347,7 @@ describe('getTodayAiGenerationCount', () => {
         dayKey: '2026-08-30',
         startMs: Date.parse('2026-08-29T16:00:00.000Z'),
         endMs: Date.parse('2026-08-30T16:00:00.000Z'),
+        serverNowMs: Date.parse('2026-08-30T12:00:00.000Z'),
       },
     });
 

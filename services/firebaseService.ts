@@ -322,18 +322,45 @@ export const updatePrizes = async (
 // Workstream A 由使用者子樹外的伺服器 counter 強制執行配額；既有 logs 保留供稽核與 UI 相容。
 // 將 logs 改為伺服器專用的 Rules 強化仍屬 Workstream B。
 
-// 由後端 callable 依 Asia/Taipei 配額日回傳 counter 的權威用量；前端僅顯示結果。
-export const getTodayAiGenerationCount = async (userUid: string): Promise<number> => {
-  if (!userUid) return 0;
+export interface AiQuotaUsageSnapshot {
+  used: number;
+  limit: number;
+  dayKey: string;
+  startMs: number;
+  endMs: number;
+  serverNowMs: number;
+}
+
+// 由後端 callable 依 Asia/Taipei 配額日回傳 counter 與日界線；前端不自行推算日期。
+export const getAiQuotaUsageSnapshot = async (userUid: string): Promise<AiQuotaUsageSnapshot> => {
+  if (!userUid) {
+    throw new Error('缺少使用者識別，無法讀取 AI 配額');
+  }
   const readQuotaUsage = httpsCallable<
     Record<string, never>,
-    { used: number; limit: number; dayKey: string; startMs: number; endMs: number }
+    AiQuotaUsageSnapshot
   >(functions, 'getAiQuotaUsage');
   const result = await readQuotaUsage({});
-  if (!Number.isFinite(result.data.used) || result.data.used < 0) {
+  const usage = result.data;
+  if (
+    !Number.isFinite(usage.used) || usage.used < 0
+    || !Number.isFinite(usage.limit) || usage.limit <= 0
+    || !/^\d{4}-\d{2}-\d{2}$/.test(usage.dayKey)
+    || !Number.isFinite(usage.startMs)
+    || !Number.isFinite(usage.endMs)
+    || !Number.isFinite(usage.serverNowMs)
+    || usage.startMs >= usage.endMs
+    || usage.serverNowMs < usage.startMs
+    || usage.serverNowMs >= usage.endMs
+  ) {
     throw new Error('後端回傳無效的 AI 配額用量');
   }
-  return result.data.used;
+  return usage;
+};
+
+export const getTodayAiGenerationCount = async (userUid: string): Promise<number> => {
+  if (!userUid) return 0;
+  return (await getAiQuotaUsageSnapshot(userUid)).used;
 };
 
 export const logCommentEdit = async (
