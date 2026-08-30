@@ -20,6 +20,8 @@ test('login and registration surfaces render without runtime errors', async ({ p
 
 test('mobile login page has no horizontal overflow', async ({ page }) => {
   await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'ClassMate AI' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-firebase-emulators', 'true');
   const dimensions = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
     clientWidth: document.documentElement.clientWidth,
