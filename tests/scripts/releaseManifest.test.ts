@@ -43,6 +43,16 @@ describe('createReleaseManifest', () => {
       .toThrow('builtAt must be ISO-8601');
   });
 
+  it.each([
+    '2026-08-29',
+    '2026-08-29T20:00:00+08:00',
+    '2026-08-29T12:00:00.000Z',
+    '2026-02-30T12:00:00Z',
+  ])('rejects a non-canonical UTC-seconds timestamp: %s', (builtAt) => {
+    expect(() => createReleaseManifest({ ...input, builtAt }))
+      .toThrow('builtAt must be ISO-8601');
+  });
+
   it('uses an accepted build timestamp verbatim in the deterministic release ID', () => {
     expect(createReleaseManifest({ ...input, builtAt: '2026-12-31T23:59:58Z' }).releaseId)
       .toBe('aaaaaaaaaaaa-bbbbbbbbbbbb-20261231T235958Z');
