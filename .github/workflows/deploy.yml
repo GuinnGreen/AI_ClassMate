@@ -93,6 +93,7 @@ jobs:
     needs: verify
     permissions:
       contents: read
+      pages: read
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main app
