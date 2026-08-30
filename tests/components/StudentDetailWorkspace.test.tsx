@@ -12,6 +12,7 @@ const service = vi.hoisted(() => ({
   toggleStudentTag: vi.fn(),
   updateStudentComment: vi.fn(),
   saveStudentNote: vi.fn(),
+  appendStudentNote: vi.fn(),
   setStudentAbsence: vi.fn(),
   updateCustomBehaviors: vi.fn(),
   updatePrizes: vi.fn(),
@@ -41,7 +42,12 @@ vi.mock('../../firebase', () => ({
 
 import { StudentDetailWorkspace } from '../../components/StudentDetailWorkspace';
 
-const TODAY = '2026-08-29';
+const testNow = new Date();
+const TODAY = [
+  testNow.getFullYear(),
+  String(testNow.getMonth() + 1).padStart(2, '0'),
+  String(testNow.getDate()).padStart(2, '0'),
+].join('-');
 
 function student(id: string, name: string, note: string): Student {
   return {
@@ -87,8 +93,12 @@ async function unlockNoteEditor() {
 describe('StudentDetailWorkspace note privacy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    service.verifyPassword.mockReset();
+    service.saveStudentNote.mockReset();
+    service.appendStudentNote.mockReset();
     service.verifyPassword.mockResolvedValue(undefined);
     service.saveStudentNote.mockResolvedValue(undefined);
+    service.appendStudentNote.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -150,8 +160,7 @@ describe('StudentDetailWorkspace note privacy', () => {
     const firstSync = new Promise<void>((resolve) => {
       resolveFirstSync = resolve;
     });
-    service.saveStudentNote
-      .mockResolvedValueOnce(undefined)
+    service.appendStudentNote
       .mockReturnValueOnce(firstSync)
       .mockResolvedValue(undefined);
     const view = render(workspace(first, students));
@@ -162,7 +171,7 @@ describe('StudentDetailWorkspace note privacy', () => {
     await screen.findByText('✅ 已儲存 甲生 的紀錄');
     fireEvent.click(screen.getByRole('button', { name: '全選' }));
     fireEvent.click(screen.getByRole('button', { name: '同步紀錄（2 位）' }));
-    await waitFor(() => expect(service.saveStudentNote).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(service.appendStudentNote).toHaveBeenCalledTimes(1));
 
     view.rerender(workspace(second, students));
     await act(async () => {
@@ -171,6 +180,31 @@ describe('StudentDetailWorkspace note privacy', () => {
     });
 
     expect(await screen.findByText('已同步至 1 位學生')).toBeInTheDocument();
-    expect(service.saveStudentNote).toHaveBeenCalledTimes(2);
+    expect(service.saveStudentNote).toHaveBeenCalledTimes(1);
+    expect(service.appendStudentNote).toHaveBeenCalledTimes(1);
+  });
+
+  it('delegates synchronization to the atomic server-note append boundary', async () => {
+    const first = student('student-1', '甲生', '甲生原有紀錄');
+    const second = student('student-2', '乙生', '畫面上的乙生舊紀錄');
+    const students = [first, second];
+    render(workspace(first, students));
+
+    const noteEditor = await unlockNoteEditor();
+    fireEvent.change(noteEditor, { target: { value: '這次要同步的私密內容' } });
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+    await screen.findByText('✅ 已儲存 甲生 的紀錄');
+    fireEvent.click(screen.getByRole('button', { name: '全選' }));
+    fireEvent.click(screen.getByRole('button', { name: '同步紀錄（1 位）' }));
+
+    await waitFor(() => {
+      expect(service.appendStudentNote).toHaveBeenCalledWith(
+        'teacher-1',
+        'student-2',
+        TODAY,
+        '這次要同步的私密內容',
+      );
+    });
+    expect(service.saveStudentNote).toHaveBeenCalledTimes(1);
   });
 });

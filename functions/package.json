@@ -6,6 +6,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:emulator:quota": "vitest run --config vitest.emulator.config.mts",
     "verify": "npm run typecheck && npm run test:run && npm run build",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",

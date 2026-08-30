@@ -2,8 +2,38 @@ import { describe, expect, it } from 'vitest';
 import {
   countChargeableQuota,
   executeWithQuotaReservation,
+  getTaipeiQuotaWindow,
   settleQuotaReservation,
 } from '../src/quotaReservation';
+
+describe('Taipei quota days', () => {
+  it('switches quota days at Taiwan midnight with exact UTC bounds', () => {
+    expect(getTaipeiQuotaWindow(Date.parse('2026-08-29T15:59:59.999Z'))).toEqual({
+      timeZone: 'Asia/Taipei',
+      dayKey: '2026-08-29',
+      startMs: Date.parse('2026-08-28T16:00:00.000Z'),
+      endMs: Date.parse('2026-08-29T16:00:00.000Z'),
+    });
+    expect(getTaipeiQuotaWindow(Date.parse('2026-08-29T16:00:00.000Z'))).toEqual({
+      timeZone: 'Asia/Taipei',
+      dayKey: '2026-08-30',
+      startMs: Date.parse('2026-08-29T16:00:00.000Z'),
+      endMs: Date.parse('2026-08-30T16:00:00.000Z'),
+    });
+  });
+
+  it('does not inherit the Functions runtime timezone', () => {
+    const previousTimezone = process.env.TZ;
+    try {
+      process.env.TZ = 'America/Los_Angeles';
+      expect(getTaipeiQuotaWindow(Date.parse('2026-08-29T16:00:00.000Z')).dayKey)
+        .toBe('2026-08-30');
+    } finally {
+      if (previousTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTimezone;
+    }
+  });
+});
 
 describe('quota reservations', () => {
   it('excludes failed and expired reservations while retaining legacy usage', () => {
@@ -15,6 +45,7 @@ describe('quota reservations', () => {
       { type: 'ai_generate', timestamp: 3, status: 'reserved', reservationExpiresAt: now + 1 },
       { type: 'ai_generate', timestamp: 4, status: 'failed' },
       { type: 'ai_generate', timestamp: 5, status: 'reserved', reservationExpiresAt: now },
+      { type: 'non_quota_audit', timestamp: 6 },
     ], now)).toBe(3);
   });
 

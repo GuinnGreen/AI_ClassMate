@@ -16,7 +16,8 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential, User } from 'firebase/auth';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule, DailyRecord, AbsenceType, Announcement, PrizeItem, CorrectionItem } from '../types';
 
 // --- Student CRUD ---
@@ -86,22 +87,43 @@ export const addPointToAllStudents = async (
   currentDate: string,
   behavior: { label: string; value: number }
 ): Promise<number> => {
-  const batch = writeBatch(db);
-  let count = 0;
-  for (const student of students) {
-    const currentDayRecord = student.dailyRecords[currentDate] || { points: [], note: '', absence: null };
-    if (currentDayRecord.absence) continue;
-    const studentRef = doc(db, `users/${userUid}/students/${student.id}`);
-    const newPoint: PointLog = { id: crypto.randomUUID(), label: behavior.label, value: behavior.value, timestamp: Date.now() };
-    const updatedPoints = [...currentDayRecord.points, newPoint];
-    batch.update(studentRef, {
-      totalScore: increment(behavior.value),
-      [`dailyRecords.${currentDate}`]: { points: updatedPoints, note: currentDayRecord.note, absence: currentDayRecord.absence ?? null }
-    });
-    count++;
-  }
-  await batch.commit();
-  return count;
+  const studentRefs = students.map(student =>
+    doc(db, `users/${userUid}/students/${student.id}`)
+  );
+
+  return runTransaction(db, async (transaction) => {
+    // Firestore requires all transaction reads before writes. Reading every class member
+    // first also preserves the previous all-or-nothing batch behavior for normal class sizes.
+    const snapshots = [];
+    for (const studentRef of studentRefs) {
+      snapshots.push(await transaction.get(studentRef));
+    }
+
+    let count = 0;
+    for (let index = 0; index < snapshots.length; index++) {
+      const snapshot = snapshots[index];
+      if (!snapshot.exists()) throw new Error('學生資料不存在');
+      const data = snapshot.data() as Student;
+      const serverRecord = data.dailyRecords?.[currentDate];
+      if (serverRecord?.absence) continue;
+
+      const newPoint: PointLog = {
+        id: crypto.randomUUID(),
+        label: behavior.label,
+        value: behavior.value,
+        timestamp: Date.now(),
+      };
+      transaction.update(studentRefs[index], {
+        totalScore: (data.totalScore ?? 0) + behavior.value,
+        [`dailyRecords.${currentDate}`]: {
+          ...(serverRecord ?? {}),
+          points: [...(serverRecord?.points ?? []), newPoint],
+        },
+      });
+      count++;
+    }
+    return count;
+  });
 };
 
 export const deletePointFromStudent = async (
@@ -174,20 +196,36 @@ export const saveStudentNote = async (
   });
 };
 
+export const appendStudentNote = async (
+  userUid: string,
+  studentId: string,
+  currentDate: string,
+  note: string,
+) => {
+  const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(studentRef);
+    if (!snapshot.exists()) throw new Error('學生資料不存在');
+    const serverRecord = snapshot.data().dailyRecords?.[currentDate] as DailyRecord | undefined;
+    const serverNote = serverRecord?.note?.trim() ?? '';
+    transaction.update(studentRef, {
+      [`dailyRecords.${currentDate}.note`]: serverNote
+        ? `${serverNote}\n---\n${note}`
+        : note,
+    });
+  });
+};
+
 export const setStudentAbsence = async (
   userUid: string,
   studentId: string,
   currentDate: string,
-  currentDayRecord: DailyRecord,
+  _currentDayRecord: DailyRecord,
   absence: AbsenceType | null
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
   await updateDoc(studentRef, {
-    [`dailyRecords.${currentDate}`]: {
-      points: currentDayRecord.points,
-      note: currentDayRecord.note,
-      absence,
-    }
+    [`dailyRecords.${currentDate}.absence`]: absence,
   });
 };
 
@@ -281,24 +319,21 @@ export const updatePrizes = async (
 // --- Research Logging ---
 // 注：logAiGeneration 與 logScheduleRecognition 已遷移至 Cloud Functions
 // (functions/src/index.ts 的 generateText / parseSchedule callable 內部寫 logs)
-// 前端 firestore.rules 已禁止 logs 寫入以防雙重計數失效 rate limit
+// Workstream A 由使用者子樹外的伺服器 counter 強制執行配額；既有 logs 保留供稽核與 UI 相容。
+// 將 logs 改為伺服器專用的 Rules 強化仍屬 Workstream B。
 
-// 查詢今日 AI 使用次數（rate limiting 用，前端只讀不寫）
+// 由後端 callable 依 Asia/Taipei 配額日回傳 counter 的權威用量；前端僅顯示結果。
 export const getTodayAiGenerationCount = async (userUid: string): Promise<number> => {
-  const logRef = collection(db, `users/${userUid}/logs`);
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const q = query(logRef, where('timestamp', '>=', startOfToday.getTime()));
-  const snapshot = await getDocs(q);
-  const now = Date.now();
-  return snapshot.docs.filter((log) => {
-    const data = log.data();
-    if (data.status === 'failed') return false;
-    if (data.status === 'reserved') {
-      return typeof data.reservationExpiresAt !== 'number' || data.reservationExpiresAt > now;
-    }
-    return true;
-  }).length;
+  if (!userUid) return 0;
+  const readQuotaUsage = httpsCallable<
+    Record<string, never>,
+    { used: number; limit: number; dayKey: string; startMs: number; endMs: number }
+  >(functions, 'getAiQuotaUsage');
+  const result = await readQuotaUsage({});
+  if (!Number.isFinite(result.data.used) || result.data.used < 0) {
+    throw new Error('後端回傳無效的 AI 配額用量');
+  }
+  return result.data.used;
 };
 
 export const logCommentEdit = async (

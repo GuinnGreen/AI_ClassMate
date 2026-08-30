@@ -6,9 +6,9 @@ import { getFirestore } from "firebase-admin/firestore";
 import { routeTextGeneration, routeVisionGeneration } from "./llmRouter";
 import { validateScheduleInput } from "./inputValidation";
 import {
-  countChargeableQuota,
   executeWithQuotaReservation,
-  QUOTA_RESERVATION_TTL_MS,
+  getQuotaUsage,
+  reserveQuota,
 } from "./quotaReservation";
 
 initializeApp();
@@ -21,39 +21,15 @@ const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const GROQ_API_KEY = defineSecret("GROQ_API_KEY");
 const OPENROUTER_API_KEY = defineSecret("OPENROUTER_API_KEY");
 
-const DAILY_QUOTA = 30;
+// 配額以 Asia/Taipei 日界線及 server-only deterministic counter 為權威；
+// users/{uid}/logs 保留既有稽核與相容格式。
 
-// ---- 共用：配額預留（transaction 內檢查 + 寫 log，杜絕檢查與計數間的空窗） ----
-// timestamp 用 Date.now() 毫秒數字（與前端 getTodayAiGenerationCount 對齊）
-async function reserveQuota(
-  uid: string,
-  type: "ai_generate" | "schedule_recognize",
-  extra: Record<string, unknown> = {}
-): Promise<FirebaseFirestore.DocumentReference> {
-  const logsRef = db.collection(`users/${uid}/logs`);
-  const startOfDayMs = new Date().setHours(0, 0, 0, 0);
-
-  return db.runTransaction(async (t) => {
-    const now = Date.now();
-    const logsSnap = await t.get(logsRef.where("timestamp", ">=", startOfDayMs));
-    const count = countChargeableQuota(logsSnap.docs.map((doc) => doc.data()), now);
-    if (count >= DAILY_QUOTA) {
-      throw new HttpsError(
-        "resource-exhausted",
-        `每日 AI 使用配額已達上限（${DAILY_QUOTA} 次）`
-      );
-    }
-    const logRef = logsRef.doc();
-    t.set(logRef, {
-      ...extra,
-      type,
-      timestamp: now,
-      status: "reserved",
-      reservationExpiresAt: now + QUOTA_RESERVATION_TTL_MS,
-    });
-    return logRef;
-  });
-}
+export const getAiQuotaUsage = onCall(async (req) => {
+  if (!req.auth) {
+    throw new HttpsError("unauthenticated", "請先登入");
+  }
+  return getQuotaUsage(db, req.auth.uid);
+});
 
 // ---- Callable: generateText（評語生成） ----
 
@@ -73,7 +49,7 @@ export const generateText = onCall(
       throw new HttpsError("invalid-argument", "prompt 過長");
     }
 
-    const logRef = await reserveQuota(uid, "ai_generate", {
+    const logRef = await reserveQuota(db, uid, "ai_generate", {
       studentId: req.data?.studentId ?? null,
       lengthSetting: req.data?.lengthSetting ?? null,
       hasCustomPrompt: req.data?.hasCustomPrompt ?? false,
@@ -111,7 +87,7 @@ export const parseSchedule = onCall(
 
     const { prompt, base64Data, mimeType } = validateScheduleInput(req.data);
 
-    const logRef = await reserveQuota(uid, "schedule_recognize");
+    const logRef = await reserveQuota(db, uid, "schedule_recognize");
 
     const text = await executeWithQuotaReservation(
       logRef,

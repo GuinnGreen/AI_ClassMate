@@ -15,7 +15,7 @@
 - Isolated Guide revision: `2b5c146dd117508877f86d97da2f9d0c37c2d54f`
 - Guide safety range: `bba701c..2b5c146dd117508877f86d97da2f9d0c37c2d54f`
 
-The main-range commits preserve concurrent-write and quota integrity; add runtime, Rules, callable-validation, browser, and Guide-capture safety tests; generate the release manifest; and harden the Pages workflow. The two Guide commits add the capture guard and its safety coverage.
+The main-range commits add transactional point/note protections and the initial quota-reservation safeguards; add runtime, Rules, callable-validation, browser, and Guide-capture safety tests; generate the release manifest; and harden the Pages workflow. The two Guide commits add the capture guard and its safety coverage. The final fix wave completes the shared-counter serialization and authoritative Taiwan-day usage boundary without claiming the deferred server-only audit/Rules work.
 
 Main commit list: `3297806`, `f9ba908`, `e8d53f5`, `283f56f`, `f9fa6d0`, `abf973e`, `72ded9a`, `d38b0d5`, `2eb1cef`, `39d45d1`, `e44f7b2`, `a7d3daa`, `aff6e7b`, `2a00377`, and `0a3a656`. Guide commit list: `4795cce` and `2b5c146`.
 

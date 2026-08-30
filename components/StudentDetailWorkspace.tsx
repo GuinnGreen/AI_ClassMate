@@ -16,6 +16,7 @@ import {
   toggleStudentTag,
   updateStudentComment,
   saveStudentNote,
+  appendStudentNote,
   setStudentAbsence,
   updateCustomBehaviors,
   updatePrizes,
@@ -340,13 +341,8 @@ export const StudentDetailWorkspace = ({
       if (syncAbortRef.current) break;
       const target = students.find(s => s.id === targetId);
       if (!target) continue;
-      const targetDayRecord = target.dailyRecords[currentDate] || { points: [], note: '', absence: null };
-      const existingNote = targetDayRecord.note?.trim() || '';
-      const mergedNote = existingNote
-        ? `${existingNote}\n---\n${tempNote}`
-        : tempNote;
       try {
-        await saveStudentNote(userUid, targetId, currentDate, targetDayRecord, mergedNote);
+        await appendStudentNote(userUid, targetId, currentDate, tempNote);
         completedCount++;
       } catch (err) {
         console.error('[handleSyncNote] failed for', targetId, err);
