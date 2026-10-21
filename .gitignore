@@ -33,3 +33,6 @@ CLAUDE.md
 # Browser verification artifacts
 test-results/
 playwright-report/
+
+# Independent Guide checkout used by CI
+_guide_repo/
