@@ -16,6 +16,7 @@ import {
   toggleStudentTag,
   updateStudentComment,
   saveStudentNote,
+  appendStudentNote,
   setStudentAbsence,
   updateCustomBehaviors,
   updatePrizes,
@@ -74,10 +75,12 @@ export const StudentDetailWorkspace = ({
   const [noteSyncMode, setNoteSyncMode] = useState(false);
   const [syncTargetIds, setSyncTargetIds] = useState<Set<string>>(new Set());
   const [isSyncing, setIsSyncing] = useState(false);
+  const syncAbortRef = useRef(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [verifyPasswordVal, setVerifyPasswordVal] = useState('');
   const [verifyError, setVerifyError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const verificationRequestRef = useRef(0);
   const [pendingAction, setPendingAction] = useState<'notes' | 'export' | 'ai'>('notes');
 
   // Behavior Settings Modal
@@ -290,10 +293,12 @@ export const StudentDetailWorkspace = ({
   // --- Secure Verification Logic ---
   const handleVerifyPassword = async () => {
     if (!auth.currentUser) return;
+    const requestId = ++verificationRequestRef.current;
     setIsVerifying(true);
     setVerifyError('');
     try {
       await verifyPassword(auth.currentUser, verifyPasswordVal);
+      if (requestId !== verificationRequestRef.current) return;
       setShowPasswordModal(false);
       setVerifyPasswordVal('');
       if (pendingAction === 'export') {
@@ -306,9 +311,9 @@ export const StudentDetailWorkspace = ({
         setIsNoteModalOpen(true);
       }
     } catch {
-      setVerifyError('密碼錯誤');
+      if (requestId === verificationRequestRef.current) setVerifyError('密碼錯誤');
     } finally {
-      setIsVerifying(false);
+      if (requestId === verificationRequestRef.current) setIsVerifying(false);
     }
   };
 
@@ -328,17 +333,17 @@ export const StudentDetailWorkspace = ({
 
   const handleSyncNote = async () => {
     setIsSyncing(true);
+    syncAbortRef.current = false;
     let failedCount = 0;
+    let completedCount = 0;
     for (const targetId of syncTargetIds) {
+      // 切換學生時中止後續寫入，避免用過期的 tempNote 繼續同步
+      if (syncAbortRef.current) break;
       const target = students.find(s => s.id === targetId);
       if (!target) continue;
-      const targetDayRecord = target.dailyRecords[currentDate] || { points: [], note: '', absence: null };
-      const existingNote = targetDayRecord.note?.trim() || '';
-      const mergedNote = existingNote
-        ? `${existingNote}\n---\n${tempNote}`
-        : tempNote;
       try {
-        await saveStudentNote(userUid, targetId, currentDate, targetDayRecord, mergedNote);
+        await appendStudentNote(userUid, targetId, currentDate, tempNote);
+        completedCount++;
       } catch (err) {
         console.error('[handleSyncNote] failed for', targetId, err);
         failedCount++;
@@ -349,7 +354,7 @@ export const StudentDetailWorkspace = ({
     setSyncTargetIds(new Set());
     setIsNoteModalOpen(false);
     if (failedCount > 0) showError(`同步註記失敗 ${failedCount} 位`);
-    else if (syncTargetIds.size > 0) showSuccess(`已同步至 ${syncTargetIds.size} 位學生`);
+    else if (completedCount > 0) showSuccess(`已同步至 ${completedCount} 位學生`);
   };
 
   const todayAbsence = (student.dailyRecords[currentDate] || { absence: null }).absence ?? null;
@@ -375,6 +380,7 @@ export const StudentDetailWorkspace = ({
   const [activeEvaluationTab, setActiveEvaluationTab] = useState(0);
   const [generationStage, setGenerationStage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const generationRequestRef = useRef(0);
   const typingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -387,7 +393,9 @@ export const StudentDetailWorkspace = ({
   // Unmount 時清除所有計時器（避免對已 unmount 的元件 setState）
   useEffect(() => {
     return () => {
+      generationRequestRef.current++;
       clearTimers();
+      syncAbortRef.current = true;
       if (copyTimeoutRef.current) { clearTimeout(copyTimeoutRef.current); copyTimeoutRef.current = null; }
     };
   }, [clearTimers]);
@@ -395,6 +403,21 @@ export const StudentDetailWorkspace = ({
   const prevStudentId = useRef(student.id);
   useEffect(() => {
     if (prevStudentId.current !== student.id) {
+      generationRequestRef.current++;
+      clearTimers();
+      setIsGenerating(false);
+      setIsTyping(false);
+      setGenerationStage('');
+      syncAbortRef.current = true; // 中止進行中的註記同步
+      verificationRequestRef.current++;
+      setIsNoteModalOpen(false);
+      setTempNote('');
+      setNoteSyncMode(false);
+      setSyncTargetIds(new Set());
+      setShowPasswordModal(false);
+      setVerifyPasswordVal('');
+      setVerifyError('');
+      setIsVerifying(false);
       setTempComment(student.comment);
       setOriginalAiText(student.originalAiComment || '');
       prevStudentId.current = student.id;
@@ -414,12 +437,13 @@ export const StudentDetailWorkspace = ({
   ];
 
   const handleGenerateAI = async () => {
+    if (isGenerating || isTyping || !canGenerate) return;
+    const requestId = ++generationRequestRef.current;
+    const isCurrent = () => generationRequestRef.current === requestId;
     clearTimers();
     setIsGenerating(true);
-    setTempComment('');
     setGenerationStage(PROGRESS_MESSAGES[0]);
 
-    // Rotate progress messages every 3 seconds
     let stageIndex = 0;
     progressRef.current = setInterval(() => {
       stageIndex = Math.min(stageIndex + 1, PROGRESS_MESSAGES.length - 1);
@@ -428,48 +452,46 @@ export const StudentDetailWorkspace = ({
 
     try {
       const generatedText = await generateStudentComment(student, "", commentLength, customPrompt);
-
-      // Stop progress, start typewriter
+      if (!isCurrent()) return;
       clearTimers();
       setGenerationStage('');
-      setIsGenerating(false);
-      setIsTyping(true);
-
-      let charIndex = 0;
-      await new Promise<void>((resolve) => {
-        typingRef.current = setInterval(() => {
-          charIndex++;
-          setTempComment(generatedText.slice(0, charIndex));
-          if (charIndex >= generatedText.length) {
-            if (typingRef.current) clearInterval(typingRef.current);
-            typingRef.current = null;
-            resolve();
-          }
-        }, 30);
-      });
-
-      setIsTyping(false);
-      setOriginalAiText(generatedText);
+      // Only successful generation consumes frontend usage. A failed save still consumed backend quota.
+      recordGeneration();
       try {
         await updateStudentComment(userUid, student.id, generatedText, generatedText);
-        // 注：logAiGeneration 已遷移至 Cloud Functions（generateText callable 內部寫 logs）
       } catch (err) {
-        console.error('[handleGenerateAI saveResult]', err);
+        if (!isCurrent()) return;
+        setTempComment(generatedText);
+        setOriginalAiText(generatedText);
         showError('AI 評語儲存失敗，請手動複製保存');
+        return;
       }
-      recordGeneration();
+      if (!isCurrent()) return;
+      setOriginalAiText(generatedText);
+      setIsTyping(true);
+      let charIndex = 0;
+      typingRef.current = setInterval(() => {
+        if (!isCurrent()) return;
+        charIndex++;
+        setTempComment(generatedText.slice(0, charIndex));
+        if (charIndex >= generatedText.length) {
+          clearTimers();
+          setIsTyping(false);
+        }
+      }, 30);
     } catch (err: unknown) {
+      if (!isCurrent()) return;
       clearTimers();
       setGenerationStage('');
-      setIsTyping(false);
-      setIsGenerating(false);
       const msg = err instanceof Error ? err.message : '未知錯誤';
-      console.error('[handleGenerateAI]', err);
       showError(`生成 AI 評語失敗：${msg}`);
+    } finally {
+      if (isCurrent()) setIsGenerating(false);
     }
   };
 
   const handleSaveComment = async () => {
+    if (isGenerating || isTyping) return;
     try {
       await updateStudentComment(userUid, student.id, tempComment);
       if (originalAiText && tempComment) {
@@ -486,6 +508,7 @@ export const StudentDetailWorkspace = ({
   };
 
   const handleCopyComment = async () => {
+    if (isGenerating || isTyping) return;
     try {
       await navigator.clipboard.writeText(tempComment);
       setIsCopied(true);
@@ -609,7 +632,7 @@ export const StudentDetailWorkspace = ({
             </button>
             <div className={`flex ${theme.surfaceAlt} p-1.5 rounded-xl`}>
               <button onClick={() => setMode('daily')} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'daily' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text} hover:shadow-md`}`}><ClipboardList className="w-4 h-4 lg:hidden" /><span className="hidden lg:inline">日常紀錄</span></button>
-              <button onClick={() => { if (mode !== 'ai') { setPendingAction('ai'); setShowPasswordModal(true); } }} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text} hover:shadow-md`}`}><Sparkles className="w-4 h-4" /><span className="hidden lg:inline">AI 評語</span></button>
+              <button aria-label="AI 評語" onClick={() => { if (mode !== 'ai') { setPendingAction('ai'); setShowPasswordModal(true); } }} className={`px-3 py-1.5 lg:px-5 lg:py-2 text-sm font-bold rounded-lg transition flex items-center gap-1 ${mode === 'ai' ? `${theme.surface} ${theme.text} shadow-sm` : `${theme.textLight} hover:${theme.text} hover:shadow-md`}`}><Sparkles className="w-4 h-4" /><span className="hidden lg:inline">AI 評語</span></button>
             </div>
             <a
               href="https://ai-classmate.com/guide/"
@@ -939,11 +962,12 @@ export const StudentDetailWorkspace = ({
                 <div className="flex flex-col h-full min-h-[300px] lg:min-h-[500px]">
                   <div className={`flex-1 ${theme.surface} p-4 lg:p-8 rounded-3xl shadow-sm border ${theme.border} flex flex-col relative`}>
                     <label className={`text-sm font-bold ${theme.textLight} mb-4 block flex items-center gap-2`}><School className="w-4 h-4" /> AI 生成結果</label>
-                    <textarea value={tempComment} onChange={(e) => setTempComment(e.target.value)} readOnly={isTyping} placeholder={isGenerating ? '等待 AI 回應中...' : '評語將顯示於此...'} className={`flex-1 w-full p-4 lg:p-6 ${theme.inputBg} rounded-2xl border ${theme.border} outline-none focus:ring-2 ${theme.focusRing} transition leading-8 ${theme.text} resize-none text-lg ${isTyping ? 'cursor-default' : ''}`} />
+                    <textarea value={tempComment} onChange={(e) => setTempComment(e.target.value)} readOnly={isGenerating || isTyping} placeholder={isGenerating ? '等待 AI 回應中...' : '評語將顯示於此...'} className={`flex-1 w-full p-4 lg:p-6 ${theme.inputBg} rounded-2xl border ${theme.border} outline-none focus:ring-2 ${theme.focusRing} transition leading-8 ${theme.text} resize-none text-lg ${isTyping ? 'cursor-default' : ''}`} />
                     <div className="absolute bottom-6 right-6 flex items-center gap-3 animate-pop-in">
                       {tempComment && (
                         <button
                           onClick={handleCopyComment}
+                          disabled={isGenerating || isTyping}
                           className={`px-4 py-2 ${theme.surfaceAlt} ${theme.text} text-sm rounded-xl hover:bg-[#e0dcd3] transition flex items-center gap-2 font-bold shadow-sm ring-1 ring-[#e6e2d8]`}
                           title="複製並紀錄修改數據"
                         >
@@ -954,6 +978,7 @@ export const StudentDetailWorkspace = ({
                       {tempComment !== student.comment && (
                         <button
                           onClick={handleSaveComment}
+                          disabled={isGenerating || isTyping}
                           className={`px-4 py-2 ${theme.accentPositive} text-white text-sm rounded-xl shadow-lg hover:opacity-90 transition flex items-center gap-2 font-bold`}
                         >
                           <Save className="w-4 h-4" /> 儲存

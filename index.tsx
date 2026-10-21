@@ -1,6 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { runtimeEnvironment } from './config/runtimeEnvironment';
+
+document.documentElement.dataset.appEnvironment = runtimeEnvironment.name;
+document.documentElement.dataset.firebaseEmulators = String(runtimeEnvironment.useFirebaseEmulators);
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

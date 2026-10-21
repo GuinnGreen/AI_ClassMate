@@ -1,6 +1,9 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_APP_ENV: 'development' | 'staging' | 'production';
+  readonly VITE_USE_FIREBASE_EMULATORS: 'true' | 'false';
+  readonly VITE_ALLOW_REMOTE_FIREBASE: 'true' | 'false';
   readonly VITE_FIREBASE_API_KEY: string;
   readonly VITE_FIREBASE_AUTH_DOMAIN: string;
   readonly VITE_FIREBASE_PROJECT_ID: string;

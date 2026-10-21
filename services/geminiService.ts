@@ -142,7 +142,11 @@ export const generateStudentComment = async (
       lengthSetting: wordCount,
       hasCustomPrompt: !!customInstruction.trim(),
     });
-    return result.data.text || "無法生成評語，請稍後再試。";
+    const text = result.data?.text;
+    if (typeof text !== 'string' || !text.trim()) {
+      throw new Error('AI 未回傳有效評語，請稍後重試。');
+    }
+    return text;
   } catch (error: unknown) {
     console.error("[AI] generateText 失敗:", error);
     const code = (error as { code?: string }).code || "";
@@ -150,17 +154,17 @@ export const generateStudentComment = async (
 
     switch (code) {
       case "functions/resource-exhausted":
-        return "今日 AI 使用配額已達上限，請明日再試。";
+        throw new Error("今日 AI 使用配額已達上限，請明日再試。");
       case "functions/unauthenticated":
-        return "請先登入後再使用 AI 功能。";
+        throw new Error("請先登入後再使用 AI 功能。");
       case "functions/invalid-argument":
-        return `輸入有誤：${message}`;
+        throw new Error(`輸入有誤：${message}`);
       case "functions/deadline-exceeded":
-        return "AI 處理超時，請稍後重試。";
+        throw new Error("AI 處理超時，請稍後重試。");
       case "functions/internal":
-        return `AI 服務內部錯誤（${message || "未知"}）`;
+        throw new Error(`AI 服務內部錯誤（${message || "未知"}）`);
       default:
-        return `AI 服務暫時無法使用：${message || "請稍後再試"}`;
+        throw new Error(`AI 服務暫時無法使用：${message || "請稍後再試"}`);
     }
   }
 };

@@ -85,7 +85,7 @@ classmate-ai/
 
 ### 環境需求
 
-- [Node.js](https://nodejs.org/) v18+
+- [Node.js](https://nodejs.org/) v20
 
 ### 安裝與啟動
 
@@ -101,16 +101,9 @@ npm install
 cp .env.example .env.local
 ```
 
-編輯 `.env.local`，填入您的 API Key 與 Firebase 設定：
+編輯 `.env.local`，填入前端 Firebase 設定：
 
 ```ini
-# Google Gemini API Key（支援多組，以逗號分隔）
-GEMINI_API_KEY=your_key_1,your_key_2,your_key_3
-
-# Groq API Key（備援 AI，Gemini 額度用盡時自動切換）
-# 免費申請：https://console.groq.com/keys
-GROQ_API_KEY=your_groq_api_key
-
 # Firebase Configuration
 VITE_FIREBASE_API_KEY=your_firebase_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
@@ -121,12 +114,32 @@ VITE_FIREBASE_APP_ID=your_app_id
 VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
 ```
 
+AI 供應商金鑰由外部部署的 Cloud Functions 執行環境管理（`GEMINI_API_KEY`、`GROQ_API_KEY`、`OPENROUTER_API_KEY`），不屬於 Vite 前端或 GitHub Pages 建置變數。
+
 ```bash
 # 4. 啟動開發伺服器
 npm run dev
 ```
 
 開啟瀏覽器訪問 `http://localhost:3000` 即可使用。
+
+### Safe local Firebase development
+
+Run Firebase emulators in one terminal:
+
+    npm run emulators
+
+Run the Vite app with emulator configuration in another terminal:
+
+    npm run dev -- --mode test
+
+Run Firestore Rules tests:
+
+    npm run test:rules
+
+The emulator project is always `demo-classmate-ai`. Do not run seed, capture, migration, or destructive scripts with production Firebase configuration.
+
+Staging credentials are not stored in the repository. A staging environment must set `VITE_APP_ENV=staging`, `VITE_ALLOW_REMOTE_FIREBASE=true`, `VITE_USE_FIREBASE_EMULATORS=false`, and a `VITE_FIREBASE_PROJECT_ID` different from `ai-teacher-classroom`; the runtime guard rejects the production project ID.
 
 ---
 
@@ -138,8 +151,6 @@ npm run dev
 
 | Secret 名稱 | 說明 |
 |-------------|------|
-| `GEMINI_API_KEY` | Gemini API Key（多組以逗號分隔） |
-| `GROQ_API_KEY` | Groq API Key（備援 AI，選填） |
 | `VITE_FIREBASE_API_KEY` | Firebase API Key |
 | `VITE_FIREBASE_AUTH_DOMAIN` | Firebase Auth Domain |
 | `VITE_FIREBASE_PROJECT_ID` | Firebase Project ID |
@@ -147,6 +158,8 @@ npm run dev
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID |
 | `VITE_FIREBASE_APP_ID` | Firebase App ID |
 | `VITE_FIREBASE_MEASUREMENT_ID` | Firebase Measurement ID |
+
+GitHub Pages 僅建置靜態前端；AI 供應商金鑰應設定於另行部署的 Cloud Functions 執行環境，不可注入 Pages 前端建置。
 
 ### 2. 設定 GitHub Pages
 
@@ -164,6 +177,12 @@ export default defineConfig({
 ```
 
 Push 到 `main` 分支後，GitHub Actions 會自動建置並部署。
+
+### Release identity
+
+`public/version.json` records the exact app and Guide revisions used by the Pages artifact. Cloud Functions and Firestore Rules are labeled `external` because this Pages workflow does not deploy them. A release manifest is evidence of source identity, not proof of live Firebase deployment parity.
+
+The `GUIDE_REF` GitHub repository variable must contain a reviewed 40-character commit SHA from `GuinnGreen/AI_ClassMate_guide`.
 
 ---
 

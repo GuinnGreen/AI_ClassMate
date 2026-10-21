@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 
 const POLL_INTERVAL = 5 * 60 * 1000; // 5 分鐘
 
+interface VersionManifest {
+  buildTime: string;
+  releaseId?: string;
+}
+
 export function useAppUpdate() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
@@ -9,7 +14,7 @@ export function useAppUpdate() {
     try {
       const res = await fetch('/version.json', { cache: 'no-store' });
       if (!res.ok) return;
-      const data = await res.json();
+      const data = await res.json() as VersionManifest;
       if (data.buildTime && data.buildTime !== __APP_BUILD_TIME__) {
         setUpdateAvailable(true);
       }
