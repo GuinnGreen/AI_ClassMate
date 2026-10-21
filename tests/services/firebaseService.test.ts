@@ -13,6 +13,7 @@ const firestore = vi.hoisted(() => ({
   runTransaction: vi.fn(),
   writeBatch: vi.fn(),
   increment: vi.fn(),
+  onSnapshot: vi.fn(),
 }));
 
 const callable = vi.hoisted(() => ({
@@ -55,6 +56,7 @@ vi.mock('firebase/firestore', async (importOriginal) => {
   return {
     ...actual,
     doc: firestore.doc,
+    onSnapshot: firestore.onSnapshot,
     collection: firestore.collection,
     query: firestore.query,
     where: firestore.where,
@@ -147,8 +149,8 @@ describe('saveStudentNote', () => {
       '新的私密註記',
     );
 
-    expect(firestore.updateDoc).toHaveBeenCalledWith(firestore.studentRef, {
-      'dailyRecords.2026-08-29.note': '新的私密註記',
+    expect(firestore.serverDocs.get(firestore.studentRef.path)).toEqual({
+      dailyRecords: { '2026-08-29': { points: [], note: '新的私密註記', absence: null } },
     });
   });
 });
@@ -354,5 +356,76 @@ describe('getTodayAiGenerationCount', () => {
     const count = await getTodayAiGenerationCount('teacher-1');
 
     expect(count).toBe(3);
+  });
+});
+
+
+describe('point writes on partial or reset day records', () => {
+  it('adds a point after a note-only write without losing note or unknown fields', async () => {
+    const path = 'users/teacher-1/students/student-1';
+    firestore.serverDocs.set(path, { totalScore: 0, dailyRecords: {
+      '2026-10-21': { note: '最新備註', marker: 'preserve' },
+    }});
+    await firebaseService.addPointToStudent('teacher-1', 'student-1', '2026-10-21',
+      { points: [], note: 'stale', absence: null }, { label: '努力', value: 1 });
+    const data = firestore.serverDocs.get(path) as any;
+    expect(data.totalScore).toBe(1);
+    expect(data.dailyRecords['2026-10-21']).toMatchObject({ note: '最新備註', marker: 'preserve' });
+    expect(data.dailyRecords['2026-10-21'].points).toHaveLength(1);
+  });
+  it('does not resurrect stale records after a server-side reset', async () => {
+    const path = 'users/teacher-1/students/student-1';
+    firestore.serverDocs.set(path, { totalScore: 0, dailyRecords: {} });
+    await firebaseService.addPointToStudent('teacher-1', 'student-1', '2026-10-21',
+      { points: [{ id: 'old', label: 'old', value: 4, timestamp: 1 }], note: 'old', absence: null },
+      { label: 'new', value: 1 });
+    const data = firestore.serverDocs.get(path) as any;
+    expect(data.dailyRecords['2026-10-21'].points).toHaveLength(1);
+    expect(data.dailyRecords['2026-10-21'].note).not.toBe('old');
+  });
+  it('deletes a point while preserving sibling fields and ignores duplicate deletion', async () => {
+    const path = 'users/teacher-1/students/student-1';
+    firestore.serverDocs.set(path, { totalScore: 1, dailyRecords: {
+      '2026-10-21': { points: [{ id: 'p', label: 'new', value: 1, timestamp: 1 }], marker: 'preserve' },
+    }});
+    const stale = { points: [], note: '', absence: null };
+    await firebaseService.deletePointFromStudent('teacher-1', 'student-1', '2026-10-21', stale, 'p', 99);
+    await firebaseService.deletePointFromStudent('teacher-1', 'student-1', '2026-10-21', stale, 'p', 99);
+    expect(firestore.serverDocs.get(path)).toMatchObject({ totalScore: 0, dailyRecords: {
+      '2026-10-21': { marker: 'preserve', points: [] },
+    }});
+  });
+});
+
+
+it('normalizes note-only and absence-only records for existing UI consumers', () => {
+  firestore.onSnapshot.mockImplementation((_ref, callback) => {
+    callback({ docs: [{ id: 'student-1', data: () => ({ name: '測試學生', dailyRecords: {
+      '2026-10-20': { note: '備註' }, '2026-10-21': { absence: '病假' },
+    } }) }] });
+    return () => {};
+  });
+  const callback = vi.fn();
+  firebaseService.subscribeToStudents('teacher-1', callback);
+  expect(callback.mock.calls[0][0][0].dailyRecords).toEqual({
+    '2026-10-20': { points: [], note: '備註', absence: null },
+    '2026-10-21': { points: [], note: '', absence: '病假' },
+  });
+});
+
+describe('legacy client compatibility for first daily writes', () => {
+  it.each(['note', 'absence', 'append', 'class'])('creates complete daily shape for %s', async operation => {
+    const path = 'users/teacher-1/students/student-1';
+    const initial = { id: 'student-1', name: '測試學生', totalScore: 0, tags: [], comment: '', dailyRecords: {} };
+    firestore.serverDocs.set(path, initial);
+    const empty = { points: [], note: '', absence: null };
+    if (operation === 'note') await saveStudentNote('teacher-1', 'student-1', '2026-10-21', empty, '備註');
+    if (operation === 'absence') await setStudentAbsence('teacher-1', 'student-1', '2026-10-21', empty, '病假');
+    if (operation === 'append') await appendStudentNote('teacher-1', 'student-1', '2026-10-21', '附加');
+    if (operation === 'class') await addPointToAllStudents('teacher-1', [initial], '2026-10-21', { label: '努力', value: 1 });
+    const record = (firestore.serverDocs.get(path) as any).dailyRecords['2026-10-21'];
+    expect(Array.isArray(record.points)).toBe(true);
+    expect(typeof record.note).toBe('string');
+    expect(record).toHaveProperty('absence');
   });
 });

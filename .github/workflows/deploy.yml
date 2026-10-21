@@ -73,9 +73,6 @@ jobs:
       - name: Verify main app
         run: npm run verify
 
-      - name: Verify Firestore Rules
-        run: npm run test:rules
-
       - name: Install and verify Functions
         run: npm ci --prefix functions && npm --prefix functions run verify
 
@@ -86,8 +83,8 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run browser smoke tests
-        run: npm run test:e2e
+      - name: Verify rules, concurrent quota and teacher browser flows
+        run: npm run test:integration
 
   build:
     needs: verify

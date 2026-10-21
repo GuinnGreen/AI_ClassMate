@@ -8,12 +8,19 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // 使用者個人資料夾（含所有 subcollection: students / settings / corrections / archives / research_logs / logs）
-    // 注：logs 集合的「寫入限制」改由 application layer 控制
-    //   - functions 用 admin SDK 寫（繞過 rules）
-    //   - 前端 caller 已從 services/firebaseService.ts 移除（避免雙重計數）
+    // Keep existing owner reads, including historical logs and the user document.
     match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    // The first collection boundary excludes logs AND all its descendants.
+    // Admin SDK is the only writer of quota/audit logs. Top-level aiQuotaCounters
+    // stays denied by default for all clients (including its owner).
+    match /users/{userId}/{collectionName}/{document=**} {
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && collectionName != 'logs';
     }
 
     // 預設拒絕所有未明確允許的存取

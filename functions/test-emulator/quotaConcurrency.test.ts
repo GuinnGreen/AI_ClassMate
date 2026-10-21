@@ -10,7 +10,7 @@ import {
 } from '../src/quotaReservation';
 
 const PROJECT_ID = 'demo-classmate-ai';
-const EMULATOR_HOST = '127.0.0.1:8081';
+const EMULATOR_HOST = '127.0.0.1:8080';
 const UID = 'quota-concurrency-teacher';
 const NOW = Date.parse('2026-08-30T03:00:00.000Z');
 

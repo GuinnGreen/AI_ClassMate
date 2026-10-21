@@ -21,6 +21,11 @@ import { db, functions } from '../firebase';
 import { Student, PointLog, ClassConfig, BehaviorButton, DaySchedule, DailyRecord, AbsenceType, Announcement, PrizeItem, CorrectionItem } from '../types';
 
 // --- Student CRUD ---
+// Preserve the complete legacy shape so already-open older clients can consume new records.
+function completeDailyRecord(record?: DailyRecord): DailyRecord {
+  return { ...record, points: record?.points ?? [], note: record?.note ?? '', absence: record?.absence ?? null };
+}
+
 
 export const subscribeToStudents = (
   userUid: string,
@@ -29,7 +34,13 @@ export const subscribeToStudents = (
 ) => {
   const studentsRef = collection(db, `users/${userUid}/students`);
   return onSnapshot(studentsRef, (snapshot) => {
-    const studentList = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Student[];
+    const studentList = snapshot.docs.map(d => {
+      const data = d.data() as Student;
+      const dailyRecords = Object.fromEntries(Object.entries(data.dailyRecords ?? {}).map(([date, record]) => [
+        date, completeDailyRecord(record),
+      ]));
+      return { ...data, id: d.id, dailyRecords };
+    });
     studentList.sort((a, b) => {
       const orderA = a.order ?? 99999;
       const orderB = b.order ?? 99999;
@@ -59,7 +70,7 @@ export const addPointToStudent = async (
   userUid: string,
   studentId: string,
   currentDate: string,
-  currentDayRecord: DailyRecord,
+  _currentDayRecord: DailyRecord,
   behavior: { label: string; value: number }
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
@@ -69,13 +80,12 @@ export const addPointToStudent = async (
     const snap = await transaction.get(studentRef);
     if (!snap.exists()) throw new Error('學生資料不存在');
     const serverRecord: DailyRecord =
-      (snap.data().dailyRecords?.[currentDate] as DailyRecord | undefined) ?? currentDayRecord;
+      (snap.data().dailyRecords?.[currentDate] as DailyRecord | undefined) ?? { points: [], note: '', absence: null };
     transaction.update(studentRef, {
       totalScore: increment(behavior.value),
       [`dailyRecords.${currentDate}`]: {
-        points: [...serverRecord.points, newPoint],
-        note: serverRecord.note,
-        absence: serverRecord.absence ?? null,
+        ...completeDailyRecord(serverRecord),
+        points: [...(serverRecord.points ?? []), newPoint],
       },
     });
   });
@@ -116,7 +126,7 @@ export const addPointToAllStudents = async (
       transaction.update(studentRefs[index], {
         totalScore: (data.totalScore ?? 0) + behavior.value,
         [`dailyRecords.${currentDate}`]: {
-          ...(serverRecord ?? {}),
+          ...completeDailyRecord(serverRecord),
           points: [...(serverRecord?.points ?? []), newPoint],
         },
       });
@@ -142,14 +152,13 @@ export const deletePointFromStudent = async (
     if (!snap.exists()) throw new Error('學生資料不存在');
     const serverRecord = snap.data().dailyRecords?.[currentDate] as DailyRecord | undefined;
     if (!serverRecord) return;
-    const targetPoint = serverRecord.points.find(p => p.id === pointId);
+    const targetPoint = (serverRecord.points ?? []).find(p => p.id === pointId);
     if (!targetPoint) return;
     transaction.update(studentRef, {
       totalScore: increment(-targetPoint.value),
       [`dailyRecords.${currentDate}`]: {
-        points: serverRecord.points.filter(p => p.id !== pointId),
-        note: serverRecord.note,
-        absence: serverRecord.absence ?? null,
+        ...completeDailyRecord(serverRecord),
+        points: (serverRecord.points ?? []).filter(p => p.id !== pointId),
       },
     });
   });
@@ -191,8 +200,11 @@ export const saveStudentNote = async (
   note: string
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
-  await updateDoc(studentRef, {
-    [`dailyRecords.${currentDate}.note`]: note,
+  await runTransaction(db, async transaction => {
+    const snapshot = await transaction.get(studentRef);
+    if (!snapshot.exists()) throw new Error('學生資料不存在');
+    const record = completeDailyRecord(snapshot.data().dailyRecords?.[currentDate]);
+    transaction.update(studentRef, { [`dailyRecords.${currentDate}`]: { ...record, note } });
   });
 };
 
@@ -209,9 +221,10 @@ export const appendStudentNote = async (
     const serverRecord = snapshot.data().dailyRecords?.[currentDate] as DailyRecord | undefined;
     const serverNote = serverRecord?.note?.trim() ?? '';
     transaction.update(studentRef, {
-      [`dailyRecords.${currentDate}.note`]: serverNote
-        ? `${serverNote}\n---\n${note}`
-        : note,
+      [`dailyRecords.${currentDate}`]: {
+        ...completeDailyRecord(serverRecord),
+        note: serverNote ? `${serverNote}\n---\n${note}` : note,
+      },
     });
   });
 };
@@ -224,8 +237,11 @@ export const setStudentAbsence = async (
   absence: AbsenceType | null
 ) => {
   const studentRef = doc(db, `users/${userUid}/students/${studentId}`);
-  await updateDoc(studentRef, {
-    [`dailyRecords.${currentDate}.absence`]: absence,
+  await runTransaction(db, async transaction => {
+    const snapshot = await transaction.get(studentRef);
+    if (!snapshot.exists()) throw new Error('學生資料不存在');
+    const record = completeDailyRecord(snapshot.data().dailyRecords?.[currentDate]);
+    transaction.update(studentRef, { [`dailyRecords.${currentDate}`]: { ...record, absence } });
   });
 };
 

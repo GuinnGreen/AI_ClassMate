@@ -21,10 +21,11 @@ const service = vi.hoisted(() => ({
   verifyPassword: vi.fn(),
 }));
 
+const ai = vi.hoisted(() => ({ generate: vi.fn(), record: vi.fn() }));
 vi.mock('../../services/firebaseService', () => service);
 vi.mock('../../services/geminiService', () => ({
   DEFAULT_SYSTEM_INSTRUCTION: 'system prompt',
-  generateStudentComment: vi.fn(),
+  generateStudentComment: ai.generate,
 }));
 vi.mock('../../hooks/useAiRateLimit', () => ({
   useAiRateLimit: () => ({
@@ -33,7 +34,7 @@ vi.mock('../../hooks/useAiRateLimit', () => ({
     dailyUsageCount: 0,
     dailyLimit: 30,
     isLimitReached: false,
-    recordGeneration: vi.fn(),
+    recordGeneration: ai.record,
   }),
 }));
 vi.mock('../../firebase', () => ({
@@ -206,5 +207,70 @@ describe('StudentDetailWorkspace note privacy', () => {
       );
     });
     expect(service.saveStudentNote).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+async function unlockAi() {
+  fireEvent.click(screen.getByRole('button', { name: 'AI 評語' }));
+  fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'test-password' } });
+  fireEvent.click(screen.getByRole('button', { name: '解鎖評語' }));
+  await screen.findByPlaceholderText('評語將顯示於此...');
+}
+
+describe('AI comment integrity', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service.verifyPassword.mockResolvedValue(undefined);
+    service.updateStudentComment.mockResolvedValue(undefined);
+    ai.generate.mockReset();
+  });
+  afterEach(cleanup);
+  it('preserves an unsaved draft and never saves or charges a failed generation', async () => {
+    const first = { ...student('student-1', '甲生', ''), comment: '既有評語' };
+    render(workspace(first, [first]));
+    await unlockAi();
+    fireEvent.change(screen.getByPlaceholderText('評語將顯示於此...'), { target: { value: '尚未儲存的修改' } });
+    ai.generate.mockRejectedValue(new Error('AI 處理超時，請稍後重試。'));
+    fireEvent.click(screen.getByRole('button', { name: /生成.*評語/ }));
+    await screen.findByText(/生成 AI 評語失敗/);
+    expect(screen.getByPlaceholderText('評語將顯示於此...')).toHaveValue('尚未儲存的修改');
+    expect(service.updateStudentComment).not.toHaveBeenCalled();
+    expect(ai.record).not.toHaveBeenCalled();
+  });
+  it('ignores a late AI result after switching students', async () => {
+    const first = student('student-1', '甲生', '');
+    const second = { ...student('student-2', '乙生', ''), comment: '乙生原評語' };
+    let finish!: (text: string) => void;
+    ai.generate.mockReturnValue(new Promise<string>(resolve => { finish = resolve; }));
+    const view = render(workspace(first, [first, second]));
+    await unlockAi();
+    fireEvent.click(screen.getByRole('button', { name: /生成.*評語/ }));
+    view.rerender(workspace(second, [first, second]));
+    await act(async () => { finish('甲生新評語'); });
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(service.updateStudentComment).not.toHaveBeenCalled();
+    expect(screen.queryByDisplayValue('甲生新評語')).not.toBeInTheDocument();
+  });
+});
+
+describe('AI animation cannot overwrite persisted text', () => {
+  afterEach(cleanup);
+  it('disables copy and save while output is animating', async () => {
+    vi.clearAllMocks();
+    service.verifyPassword.mockResolvedValue(undefined);
+    service.updateStudentComment.mockResolvedValue(undefined);
+    ai.generate.mockResolvedValue('完整的測試評語必須保留，不能被打字動畫中的片段覆寫。');
+    const first = { ...student('student-1', '甲生', ''), comment: '原評語' };
+    render(workspace(first, [first]));
+    await unlockAi();
+    fireEvent.click(screen.getByRole('button', { name: /生成.*評語/ }));
+    await waitFor(() => expect(service.updateStudentComment).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: '儲存' })).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: '儲存' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '複製' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }));
+    fireEvent.click(screen.getByRole('button', { name: '複製' }));
+    expect(service.updateStudentComment).toHaveBeenCalledTimes(1);
   });
 });
