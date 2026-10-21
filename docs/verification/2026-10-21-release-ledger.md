@@ -29,6 +29,10 @@ Ruling: unrelated Guide captureExtras, video assets and scripts remain in the or
 Deferred: bundle-size warning, dependency modernization, visual polish, archive semantics and broader AI privacy redesign remain outside the requested priority fixes.
 
 ## Release status
-Deployment pending final committed source and backend rollout. Final live identifiers will be recorded after verification.
+Guide PR #1 and Main PR #2 are merged. Guide pinned revision remains 30966f4a56492af09353da300dcf3936ae63f607. Original dirty worktree patch ID remains unchanged.
+
+Firebase rules deployed and exact readback matched source SHA-256 e16880aad6976d98b58f983ed26575c82e754e81d0e6dae9257e35c7cd70ff07. All three Functions (generateText, parseSchedule, getAiQuotaUsage) deployed in asia-east1 and runtime readback confirmed nodejs22. Live demo-account checks passed authentication, quota retrieval, unauthenticated denial, invalid schedule rejection, denied client log deletion, and one real generic AI generation with quota delta +1. No teacher/student comment was written by the production checks.
+
+Pages CI exposed two cross-project issues: TypeScript included the independent _guide_repo checkout; Vite's cold dependency scan selected Guide's react-dom/client while using Main's React, causing Hook startup failures. Both were reproduced locally. Exclude the independent checkout from Main typecheck and restrict dependency scan to Main index.html. Guide is separately verified. Browser startup diagnostics are now emitted by E2E tests. Pages remains gated on the complete CI suite; live front-end acceptance follows its successful deployment.
 
 Ruling: deployment preflight reported Node.js 20 decommission on 2026-10-30. Upgrade Functions runtime/engine and CI to Node.js 22 without changing dependency versions. Functions typecheck, 11 tests and build passed again using Node 22.23.1; the final runtime rollout follows the already-running first backend deployment.

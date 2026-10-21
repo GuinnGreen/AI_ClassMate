@@ -11,6 +11,11 @@ export default defineConfig(() => {
       host: 'localhost',
     },
     plugins: [react(), tailwindcss()],
+    // CI also checks out the independent Guide app under _guide_repo. Scanning
+    // its HTML can mix Guide's React DOM with this app's React instance.
+    optimizeDeps: {
+      entries: ['index.html'],
+    },
     define: {
       // LLM API keys 已遷移至 Cloud Functions（functions/src/index.ts）
       // 前端僅持有 Firebase 公鑰，所有 LLM 呼叫透過 httpsCallable 走後端 proxy
