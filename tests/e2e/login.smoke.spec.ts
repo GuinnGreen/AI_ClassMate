@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import './diagnostics';
 
 test('login and registration surfaces render without runtime errors', async ({ page }) => {
   const errors: string[] = [];

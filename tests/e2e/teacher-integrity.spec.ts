@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import './diagnostics';
 
 test('real emulator login, scoring and AI failure preserve teacher data', async ({ page, request }, testInfo) => {
   test.skip(!process.env.FIRESTORE_EMULATOR_HOST, 'Requires isolated Auth and Firestore emulators');
