@@ -30,3 +30,5 @@ Deferred: bundle-size warning, dependency modernization, visual polish, archive 
 
 ## Release status
 Deployment pending final committed source and backend rollout. Final live identifiers will be recorded after verification.
+
+Ruling: deployment preflight reported Node.js 20 decommission on 2026-10-30. Upgrade Functions runtime/engine and CI to Node.js 22 without changing dependency versions. Functions typecheck, 11 tests and build passed again using Node 22.23.1; the final runtime rollout follows the already-running first backend deployment.
