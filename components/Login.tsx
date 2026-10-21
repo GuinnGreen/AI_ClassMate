@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth } from '../firebaseAuth';
 import { LIGHT_THEME } from '../constants/theme';
 import { School, LogIn, UserPlus } from 'lucide-react';
 

@@ -56,6 +56,21 @@ describe('Firebase runtime connections', () => {
     delete (globalThis as typeof globalThis & {
       __CLASSMATE_EMULATORS_CONNECTED__?: boolean;
     }).__CLASSMATE_EMULATORS_CONNECTED__;
+    delete (globalThis as typeof globalThis & {
+      __CLASSMATE_AUTH_EMULATOR_CONNECTED__?: boolean;
+    }).__CLASSMATE_AUTH_EMULATOR_CONNECTED__;
+  });
+
+  it('initializes login without loading data SDKs, then shares Auth with the classroom', async () => {
+    const login = await import('../firebaseAuth');
+    expect(login.auth).toBe(firebase.auth);
+    expect(firebase.getFirestore).not.toHaveBeenCalled();
+    expect(firebase.getFunctions).not.toHaveBeenCalled();
+    const classroom = await import('../firebase');
+    expect(classroom.auth).toBe(login.auth);
+    expect(firebase.initializeApp).toHaveBeenCalledTimes(1);
+    expect(firebase.connectAuthEmulator).toHaveBeenCalledTimes(1);
+    expect(firebase.connectFirestoreEmulator).toHaveBeenCalledTimes(1);
   });
 
   it('connects every Firebase SDK to localhost emulators only once', async () => {

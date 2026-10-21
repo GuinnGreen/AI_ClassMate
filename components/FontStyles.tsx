@@ -5,8 +5,6 @@ export const FontStyles = ({ zhuyinMode = false }: { zhuyinMode?: boolean }) => 
 
   return (
     <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Zen+Maru+Gothic:wght@400;500;700&display=swap');
-
       @font-face {
         font-family: 'BpmfHuninn';
         src: url('/fonts/BpmfHuninn-Regular.woff2') format('woff2');

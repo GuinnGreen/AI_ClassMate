@@ -16,9 +16,10 @@ export default defineConfig({
     { name: 'mobile-chromium', use: { ...devices['iPhone 13'], browserName: 'chromium' } },
   ],
   webServer: {
-    command: 'npm run dev -- --mode test',
+    // Exercise real split chunks and asset URLs, with isolated emulator config.
+    command: 'npm run build -- --mode test && npm run preview -- --host localhost --port 3000',
     url: 'http://localhost:3000',
-    // An arbitrary local Vite server cannot prove it was started in test mode.
+    // An arbitrary local server cannot prove it serves the isolated test build.
     reuseExistingServer: false,
     timeout: 120_000,
   },

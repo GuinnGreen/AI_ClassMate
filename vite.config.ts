@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig(() => {
   return {
     base: '/',
+    build: { manifest: true },
     server: {
       port: 3000,
       host: 'localhost',

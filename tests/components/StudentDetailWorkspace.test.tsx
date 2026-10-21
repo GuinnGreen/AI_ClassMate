@@ -22,6 +22,8 @@ const service = vi.hoisted(() => ({
 }));
 
 const ai = vi.hoisted(() => ({ generate: vi.fn(), record: vi.fn() }));
+const spreadsheet = vi.hoisted(() => ({ write: vi.fn() }));
+vi.mock('../../services/spreadsheetWriter', () => ({ writeSpreadsheet: spreadsheet.write }));
 vi.mock('../../services/firebaseService', () => service);
 vi.mock('../../services/geminiService', () => ({
   DEFAULT_SYSTEM_INSTRUCTION: 'system prompt',
@@ -272,5 +274,27 @@ describe('AI animation cannot overwrite persisted text', () => {
     fireEvent.click(screen.getByRole('button', { name: '儲存' }));
     fireEvent.click(screen.getByRole('button', { name: '複製' }));
     expect(service.updateStudentComment).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('deferred spreadsheet export', () => {
+  afterEach(cleanup);
+  it('keeps the export dialog usable after failure and retries successfully', async () => {
+    vi.clearAllMocks();
+    service.verifyPassword.mockResolvedValue(undefined);
+    spreadsheet.write.mockImplementationOnce(() => { throw new Error('download failure'); });
+    const first = student('student-1', '甲生', '原有輔導備註');
+    render(workspace(first, [first]));
+    fireEvent.click(screen.getByRole('button', { name: '匯出整班紀錄' }));
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'teacher-password' } });
+    fireEvent.click(screen.getByRole('button', { name: '驗證並匯出' }));
+    fireEvent.click(await screen.findByRole('button', { name: '匯出 Excel' }));
+    await screen.findByText('匯出失敗，請檢查網路後重試。');
+    const retry = screen.getByRole('button', { name: '匯出 Excel' });
+    expect(retry).toBeEnabled();
+    expect(service.updateStudentComment).not.toHaveBeenCalled();
+    fireEvent.click(retry);
+    await waitFor(() => expect(spreadsheet.write).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole('button', { name: '匯出 Excel' })).not.toBeInTheDocument());
   });
 });

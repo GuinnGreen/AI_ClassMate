@@ -42,7 +42,6 @@ import {
   PrizeItem,
   DEFAULT_PRIZES,
 } from '../types';
-import * as XLSX from 'xlsx';
 import { auth } from '../firebase';
 import { useAiRateLimit } from '../hooks/useAiRateLimit';
 
@@ -87,6 +86,7 @@ export const StudentDetailWorkspace = ({
   const [isBehaviorSettingsOpen, setIsBehaviorSettingsOpen] = useState(false);
 
   // Export State
+  const [isExporting, setIsExporting] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportTab, setExportTab] = useState<'class' | 'counseling'>('class');
   const [counselingClassCode, setCounselingClassCode] = useState('');
@@ -100,121 +100,135 @@ export const StudentDetailWorkspace = ({
     totalScore: true,
   });
 
-  const handleExportXlsx = () => {
-    const headers = ['座號', '姓名', '日期'];
-    if (exportFields.behaviorDetail) headers.push('行為紀錄明細');
-    if (exportFields.dailyScore) headers.push('當日得分');
-    if (exportFields.note) headers.push('輔導備註');
-    if (exportFields.aiComment) headers.push('AI 評語');
-    if (exportFields.tags) headers.push('特質標籤');
-    if (exportFields.totalScore) headers.push('累計總分');
+  const handleExportXlsx = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const { writeSpreadsheet } = await import('../services/spreadsheetWriter');
+      const headers = ['座號', '姓名', '日期'];
+      if (exportFields.behaviorDetail) headers.push('行為紀錄明細');
+      if (exportFields.dailyScore) headers.push('當日得分');
+      if (exportFields.note) headers.push('輔導備註');
+      if (exportFields.aiComment) headers.push('AI 評語');
+      if (exportFields.tags) headers.push('特質標籤');
+      if (exportFields.totalScore) headers.push('累計總分');
 
-    const rows: (string | number)[][] = [];
+      const rows: (string | number)[][] = [];
 
-    const sortedStudents = [...students].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const sortedStudents = [...students].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-    for (const s of sortedStudents) {
-      const dates = Object.keys(s.dailyRecords).sort();
-      let isFirstRow = true;
-      for (const date of dates) {
-        const record = s.dailyRecords[date];
-        const hasPoints = record.points.length > 0;
-        const hasNote = record.note && record.note.trim().length > 0;
-        if (!hasPoints && !hasNote) continue;
+      for (const s of sortedStudents) {
+        const dates = Object.keys(s.dailyRecords).sort();
+        let isFirstRow = true;
+        for (const date of dates) {
+          const record = s.dailyRecords[date];
+          const hasPoints = record.points.length > 0;
+          const hasNote = record.note && record.note.trim().length > 0;
+          if (!hasPoints && !hasNote) continue;
 
-        const row: (string | number)[] = [
-          s.seatNumber ?? (s.order ?? 0) + 1,
-          s.name,
-          date,
-        ];
+          const row: (string | number)[] = [
+            s.seatNumber ?? (s.order ?? 0) + 1,
+            s.name,
+            date,
+          ];
 
-        if (exportFields.behaviorDetail) {
-          const groups: Record<string, { label: string; value: number; count: number }> = {};
-          record.points.forEach(p => {
-            if (!groups[p.label]) groups[p.label] = { label: p.label, value: p.value, count: 0 };
-            groups[p.label].count += 1;
-          });
-          const detail = Object.values(groups)
-            .map(g => `${g.label}(${g.value > 0 ? '+' : ''}${g.value})×${g.count}`)
-            .join(', ');
-          row.push(detail);
+          if (exportFields.behaviorDetail) {
+            const groups: Record<string, { label: string; value: number; count: number }> = {};
+            record.points.forEach(p => {
+              if (!groups[p.label]) groups[p.label] = { label: p.label, value: p.value, count: 0 };
+              groups[p.label].count += 1;
+            });
+            const detail = Object.values(groups)
+              .map(g => `${g.label}(${g.value > 0 ? '+' : ''}${g.value})×${g.count}`)
+              .join(', ');
+            row.push(detail);
+          }
+
+          if (exportFields.dailyScore) {
+            const score = record.points.reduce((sum, p) => sum + p.value, 0);
+            row.push(score);
+          }
+
+          if (exportFields.note) {
+            row.push(record.note || '');
+          }
+
+          if (exportFields.aiComment) {
+            row.push(isFirstRow ? (s.comment || '') : '');
+          }
+
+          if (exportFields.tags) {
+            row.push(isFirstRow ? s.tags.join(', ') : '');
+          }
+
+          if (exportFields.totalScore) {
+            row.push(isFirstRow ? s.totalScore : '');
+          }
+
+          rows.push(row);
+          isFirstRow = false;
         }
-
-        if (exportFields.dailyScore) {
-          const score = record.points.reduce((sum, p) => sum + p.value, 0);
-          row.push(score);
-        }
-
-        if (exportFields.note) {
-          row.push(record.note || '');
-        }
-
-        if (exportFields.aiComment) {
-          row.push(isFirstRow ? (s.comment || '') : '');
-        }
-
-        if (exportFields.tags) {
-          row.push(isFirstRow ? s.tags.join(', ') : '');
-        }
-
-        if (exportFields.totalScore) {
-          row.push(isFirstRow ? s.totalScore : '');
-        }
-
-        rows.push(row);
-        isFirstRow = false;
       }
-    }
 
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '班級紀錄');
-    const today = formatDate(new Date());
-    XLSX.writeFile(wb, `班級紀錄_${today}.xlsx`);
-    setIsExportModalOpen(false);
+      const today = formatDate(new Date());
+      writeSpreadsheet([headers, ...rows], '班級紀錄', `班級紀錄_${today}.xlsx`);
+      setIsExportModalOpen(false);
+    } catch (error) {
+      console.error('[spreadsheet export]', error);
+      showError('匯出失敗，請檢查網路後重試。');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  const handleExportCounseling = () => {
-    const semester = getCurrentSemester();
-    const academicYear = parseInt(semester.label);
-    const semesterNum = semester.label.includes('上') ? 1 : 2;
+  const handleExportCounseling = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const { writeSpreadsheet } = await import('../services/spreadsheetWriter');
+      const semester = getCurrentSemester();
+      const academicYear = parseInt(semester.label);
+      const semesterNum = semester.label.includes('上') ? 1 : 2;
 
-    const headers = ['學年', '學期', '學號', '班級代碼', '座號', '年級', '日期', '晤談對象', '輔導內容要點', '他校記錄者', '記錄者學校'];
-    const rows: (string | number)[][] = [];
+      const headers = ['學年', '學期', '學號', '班級代碼', '座號', '年級', '日期', '晤談對象', '輔導內容要點', '他校記錄者', '記錄者學校'];
+      const rows: (string | number)[][] = [];
 
-    const sortedStudents = [...students].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const sortedStudents = [...students].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-    for (const s of sortedStudents) {
-      const seatNum = String(s.seatNumber ?? (s.order ?? 0) + 1).padStart(2, '0');
-      const dates = Object.keys(s.dailyRecords).sort();
+      for (const s of sortedStudents) {
+        const seatNum = String(s.seatNumber ?? (s.order ?? 0) + 1).padStart(2, '0');
+        const dates = Object.keys(s.dailyRecords).sort();
 
-      for (const date of dates) {
-        if (date < semester.semesterStart || date > semester.semesterEnd) continue;
-        const record = s.dailyRecords[date];
-        if (!record.note || !record.note.trim()) continue;
+        for (const date of dates) {
+          if (date < semester.semesterStart || date > semester.semesterEnd) continue;
+          const record = s.dailyRecords[date];
+          if (!record.note || !record.note.trim()) continue;
 
-        rows.push([
-          academicYear,
-          semesterNum,
-          '',
-          counselingClassCode,
-          seatNum,
-          counselingGrade ? parseInt(counselingGrade) : '',
-          date.replace(/-/g, ''),
-          '學生',
-          record.note.trim(),
-          '',
-          '',
-        ]);
+          rows.push([
+            academicYear,
+            semesterNum,
+            '',
+            counselingClassCode,
+            seatNum,
+            counselingGrade ? parseInt(counselingGrade) : '',
+            date.replace(/-/g, ''),
+            '學生',
+            record.note.trim(),
+            '',
+            '',
+          ]);
+        }
       }
-    }
 
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '工作表1');
-    const today = formatDate(new Date());
-    XLSX.writeFile(wb, `輔導紀錄_${today}.xls`, { bookType: 'biff8' });
-    setIsExportModalOpen(false);
+      const today = formatDate(new Date());
+      writeSpreadsheet([headers, ...rows], '工作表1', `輔導紀錄_${today}.xls`, 'biff8');
+      setIsExportModalOpen(false);
+    } catch (error) {
+      console.error('[spreadsheet export]', error);
+      showError('匯出失敗，請檢查網路後重試。');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const positiveBehaviors = classConfig.customBehaviors?.positive || DEFAULT_POSITIVE_BEHAVIORS;
@@ -1153,9 +1167,10 @@ export const StudentDetailWorkspace = ({
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={handleExportXlsx}
+                  disabled={isExporting}
                   className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2`}
                 >
-                  <Download className="w-4 h-4" /> 匯出 Excel
+                  <Download className="w-4 h-4" /> {isExporting ? '匯出中...' : '匯出 Excel'}
                 </button>
                 <button
                   onClick={() => setIsExportModalOpen(false)}
@@ -1193,10 +1208,10 @@ export const StudentDetailWorkspace = ({
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={handleExportCounseling}
-                  disabled={!counselingClassCode || !counselingGrade}
+                  disabled={isExporting || !counselingClassCode || !counselingGrade}
                   className={`flex-1 py-3 ${theme.primary} text-white rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-40`}
                 >
-                  <Download className="w-4 h-4" /> 匯出輔導紀錄
+                  <Download className="w-4 h-4" /> {isExporting ? '匯出中...' : '匯出輔導紀錄'}
                 </button>
                 <button
                   onClick={() => setIsExportModalOpen(false)}

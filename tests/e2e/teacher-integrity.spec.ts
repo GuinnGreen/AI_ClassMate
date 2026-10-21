@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 import './diagnostics';
+import { readFileSync } from 'node:fs';
+import * as XLSX from 'xlsx';
 
 test('real emulator login, scoring and AI failure preserve teacher data', async ({ page, request }, testInfo) => {
   test.skip(!process.env.FIRESTORE_EMULATOR_HOST, 'Requires isolated Auth and Firestore emulators');
@@ -33,6 +35,8 @@ test('real emulator login, scoring and AI failure preserve teacher data', async 
     json: { error: { status: 'RESOURCE_EXHAUSTED', message: 'Test quota exceeded' } },
   }));
   const errors: string[] = [];
+  const requests: string[] = [];
+  page.on('request', request => requests.push(request.url()));
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');
   await page.locator('input[type="email"]').fill(email);
@@ -59,6 +63,44 @@ test('real emulator login, scoring and AI failure preserve teacher data', async 
   await expect(page.getByPlaceholder('評語將顯示於此...')).toHaveValue('原有評語必須保留');
   const after = await (await request.get(studentUrl, { headers: { Authorization: 'Bearer owner' } })).json();
   expect(after.fields.comment.stringValue).toBe('原有評語必須保留');
+  expect(requests.some(url => /spreadsheetWriter/.test(url))).toBe(false);
+
+  const openExport = async () => {
+    await page.getByRole('button', { name: '匯出整班紀錄' }).click();
+    await page.getByPlaceholder('Password').fill(password);
+    await page.getByRole('button', { name: '驗證並匯出' }).click();
+    await expect(page.getByRole('heading', { name: '匯出資料', exact: true })).toBeVisible();
+  };
+  await openExport();
+  const xlsxDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: '匯出 Excel', exact: true }).click();
+  const xlsx = await xlsxDownload;
+  expect(xlsx.suggestedFilename()).toMatch(/\.xlsx$/);
+  const classBook = XLSX.read(readFileSync((await xlsx.path())!));
+  const classRows = XLSX.utils.sheet_to_json(classBook.Sheets['班級紀錄']);
+  expect(classRows[0]).toMatchObject({ 姓名: '驗證學生', 當日得分: 1, 'AI 評語': '原有評語必須保留' });
+  expect(requests.some(url => /spreadsheetWriter/.test(url))).toBe(true);
+  await openExport();
+  await page.getByRole('button', { name: '輔導紀錄', exact: true }).last().click();
+  await page.getByPlaceholder('例如 101').fill('101');
+  await page.getByPlaceholder('例如 1', { exact: true }).fill('1');
+  const xlsDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: '匯出輔導紀錄', exact: true }).click();
+  const xls = await xlsDownload;
+  expect(xls.suggestedFilename()).toMatch(/\.xls$/);
+  const counselingBook = XLSX.read(readFileSync((await xls.path())!));
+  expect(XLSX.utils.sheet_to_json(counselingBook.Sheets['工作表1'])[0]).toMatchObject({ 輔導內容要點: '原有備註必須保留', 班級代碼: '101' });
   expect(errors).toEqual([]);
   await page.screenshot({ path: `/tmp/classmate-integrity-${testInfo.project.name}.png` });
+  if (testInfo.project.name === 'mobile-chromium') {
+    await page.locator('button.fixed').first().click();
+  }
+  await page.getByRole('button', { name: '登出系統' }).click();
+  await expect(page.getByRole('heading', { name: 'ClassMate AI', exact: true })).toBeVisible();
+  await page.locator('input[type="email"]').fill(email);
+  await page.locator('input[type="password"]').fill(password);
+  await page.getByRole('button', { name: '進入系統' }).click();
+  await expect(page.getByRole('heading', { name: '主畫面' })).toBeAttached();
+  await expect(page.getByRole('button', { name: /1 驗證學生/ })).toBeAttached();
+  expect(errors).toEqual([]);
 });

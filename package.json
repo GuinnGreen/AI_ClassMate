@@ -15,9 +15,10 @@
     "test:rules:run": "vitest run --config vitest.rules.config.ts",
     "test:rules": "firebase emulators:exec --project demo-classmate-ai --only firestore \"npm run test:rules:run\"",
     "release:manifest": "tsx scripts/generate-release-manifest.mjs",
-    "verify": "npm run typecheck && npm run test:run && npm run build",
+    "verify": "npm run typecheck && npm run test:run && npm run build && npm run test:bundle",
     "preview": "vite preview",
-    "test:integration": "firebase emulators:exec --project demo-classmate-ai --only auth,firestore \"npm run test:rules:run && npm --prefix functions run test:emulator:quota && npm run test:e2e\""
+    "test:integration": "firebase emulators:exec --project demo-classmate-ai --only auth,firestore \"npm run test:rules:run && npm --prefix functions run test:emulator:quota && npm run test:e2e\"",
+    "test:bundle": "node scripts/check-bundle.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.41.0",
